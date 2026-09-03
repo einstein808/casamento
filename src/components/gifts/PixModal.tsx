@@ -1,0 +1,311 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { 
+  X, 
+  Copy, 
+  Check, 
+  QrCode, 
+  Heart, 
+  PartyPopper, 
+  ShieldCheck, 
+  Smartphone, 
+  Sparkles 
+} from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { Gift, WeddingSettings } from '@/lib/types';
+import { generatePixPayload, generatePixQrCode } from '@/lib/pix';
+import { WeddingService } from '@/lib/wedding-service';
+import { formatCurrency } from '@/lib/utils';
+
+interface PixModalProps {
+  gift: Gift | null;
+  settings: WeddingSettings;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModalProps) {
+  const [step, setStep] = useState<'form' | 'pix' | 'success'>('form');
+  const [guestName, setGuestName] = useState('');
+  const [guestMessage, setGuestMessage] = useState('');
+  const [customAmount, setCustomAmount] = useState<number>(0);
+  
+  const [pixPayload, setPixPayload] = useState('');
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setStep('form');
+      setGuestName('');
+      setGuestMessage('');
+      setCopied(false);
+      setCustomAmount(gift?.price || 100);
+    }
+  }, [isOpen, gift]);
+
+  if (!isOpen || !gift) return null;
+
+  const finalAmount = gift.price > 0 ? gift.price : (customAmount || 100);
+
+  const handleGeneratePix = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!guestName.trim()) return;
+
+    setIsGenerating(true);
+
+    try {
+      // Generate PIX EMV Code
+      const payload = generatePixPayload({
+        pixKey: settings.pixKey,
+        merchantName: settings.pixMerchantName || `${settings.brideName} e ${settings.groomName}`,
+        merchantCity: settings.pixMerchantCity || 'BRASIL',
+        amount: finalAmount,
+        description: `Presente: ${gift.title.slice(0, 20)}`,
+      });
+
+      setPixPayload(payload);
+
+      // Generate QR Code image
+      const qrDataUrl = await generatePixQrCode(payload);
+      setQrCodeUrl(qrDataUrl);
+
+      setStep('pix');
+    } catch (err) {
+      console.error('Erro ao gerar PIX:', err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCopyPix = () => {
+    navigator.clipboard.writeText(pixPayload);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+  };
+
+  const handleConfirmSent = () => {
+    // Record contribution
+    WeddingService.recordPixContribution({
+      giftId: gift.id,
+      giftTitle: gift.title,
+      guestName: guestName.trim(),
+      amount: finalAmount,
+      message: guestMessage.trim(),
+      pixCode: pixPayload,
+      status: 'confirmed',
+    });
+
+    setStep('success');
+    confetti({
+      particleCount: 150,
+      spread: 80,
+      origin: { y: 0.6 },
+      colors: ['#c2847a', '#d9c5b2', '#e0a899', '#fdfbf7', '#2e4057'],
+    });
+
+    onSuccess();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-[#F0E6DF] overflow-hidden">
+        {/* Modal Header */}
+        <div className="p-6 bg-gradient-to-r from-[#FAF3EE] to-[#FDFBF7] border-b border-[#EADBCE] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#C2847A]/10 text-[#C2847A] flex items-center justify-center font-bold">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-serif text-xl font-medium text-[#2D2422]">
+                Presentear os Noivos
+              </h3>
+              <p className="text-xs text-[#8D7B75]">
+                {gift.title} • {formatCurrency(finalAmount)}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-black/5 text-[#8D7B75] transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-6 sm:p-8">
+          {step === 'form' && (
+            <form onSubmit={handleGeneratePix} className="space-y-5">
+              {/* Product preview card */}
+              <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FDFBF7] border border-[#F0E6DF]">
+                <img
+                  src={gift.imageUrl}
+                  alt={gift.title}
+                  className="w-16 h-16 rounded-xl object-cover"
+                />
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-[#2D2422]">{gift.title}</h4>
+                  <p className="text-xs text-[#8D7B75] line-clamp-1">{gift.description}</p>
+                  <p className="text-sm font-bold text-[#C2847A] mt-1">
+                    {formatCurrency(finalAmount)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Guest name */}
+              <div className="space-y-1.5">
+                <label className="block text-xs uppercase tracking-wider text-[#8D7B75] font-semibold">
+                  Seu Nome ou Família: <span className="text-[#C2847A]">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="Ex: Tio Paulo e Família"
+                  className="w-full px-4 py-3 rounded-xl bg-[#FDFBF7] border border-[#E8DCD5] text-sm focus:outline-none focus:border-[#C2847A]"
+                />
+              </div>
+
+              {/* Message to couple */}
+              <div className="space-y-1.5">
+                <label className="block text-xs uppercase tracking-wider text-[#8D7B75] font-semibold">
+                  Mensagem de carinho para os noivos:
+                </label>
+                <textarea
+                  rows={3}
+                  value={guestMessage}
+                  onChange={(e) => setGuestMessage(e.target.value)}
+                  placeholder="Escreva seus votos de amor e felicidades..."
+                  className="w-full px-4 py-3 rounded-xl bg-[#FDFBF7] border border-[#E8DCD5] text-sm focus:outline-none focus:border-[#C2847A] resize-none"
+                />
+              </div>
+
+              {/* Submit button */}
+              <button
+                type="submit"
+                disabled={isGenerating || !guestName.trim()}
+                className="w-full py-3.5 rounded-2xl bg-[#C2847A] text-white font-medium text-sm sm:text-base hover:bg-[#B07065] shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <QrCode className="w-5 h-5" />
+                <span>{isGenerating ? 'Gerando PIX...' : 'Avançar para Pagamento PIX'}</span>
+              </button>
+            </form>
+          )}
+
+          {step === 'pix' && (
+            <div className="space-y-6 text-center animate-in fade-in duration-300">
+              <div className="space-y-1">
+                <span className="text-xs uppercase tracking-wider text-[#C2847A] font-bold">
+                  Quase lá! Escaneie ou Copie o PIX
+                </span>
+                <h4 className="font-serif text-xl font-medium text-[#2D2422]">
+                  {formatCurrency(finalAmount)}
+                </h4>
+                <p className="text-xs text-[#8D7B75]">
+                  Destinatário: <span className="font-semibold">{settings.pixMerchantName || `${settings.brideName} e ${settings.groomName}`}</span>
+                </p>
+              </div>
+
+              {/* QR Code Container */}
+              {qrCodeUrl && (
+                <div className="inline-block p-4 rounded-3xl bg-[#FAF3EE] border border-[#EADBCE] shadow-sm">
+                  <img
+                    src={qrCodeUrl}
+                    alt="PIX QR Code"
+                    className="w-48 h-48 sm:w-56 sm:h-56 mx-auto rounded-xl shadow-xs"
+                  />
+                  <p className="text-[11px] text-[#8D7B75] mt-2">
+                    Abra o app do seu banco e aponte a câmera
+                  </p>
+                </div>
+              )}
+
+              {/* PIX Copia e Cola */}
+              <div className="space-y-2 text-left">
+                <label className="block text-xs uppercase tracking-wider text-[#8D7B75] font-semibold text-center">
+                  Ou use o PIX Copia e Cola:
+                </label>
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[#FDFBF7] border border-[#E8DCD5]">
+                  <input
+                    type="text"
+                    readOnly
+                    value={pixPayload}
+                    className="flex-1 bg-transparent text-xs text-[#6B5A55] font-mono focus:outline-none overflow-hidden text-ellipsis"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCopyPix}
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-[#C2847A] text-white text-xs font-semibold hover:bg-[#B07065] flex items-center gap-1 transition-colors"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Copiado!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copiar</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmSent}
+                  className="w-full py-3.5 rounded-2xl bg-[#C2847A] text-white font-medium text-sm sm:text-base hover:bg-[#B07065] shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
+                >
+                  <Check className="w-5 h-5" />
+                  <span>Já realizei o PIX no banco</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStep('form')}
+                  className="text-xs text-[#8D7B75] hover:underline"
+                >
+                  Voltar e editar mensagem
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 'success' && (
+            <div className="text-center py-6 space-y-6 animate-in zoom-in-95 duration-300">
+              <div className="inline-flex p-4 rounded-full bg-[#FAF3EE] text-[#C2847A]">
+                <PartyPopper className="w-12 h-12 animate-bounce" />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="font-serif text-2xl sm:text-3xl font-medium text-[#2D2422]">
+                  Muito Obrigado! ❤️
+                </h3>
+                <p className="text-sm text-[#6B5A55] max-w-sm mx-auto">
+                  {guestName}, seu presente ({gift.title}) e sua mensagem foram registrados com muito amor no nosso coração!
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-8 py-3 rounded-full bg-[#C2847A] text-white font-medium text-sm hover:bg-[#B07065] shadow-sm transition-all"
+              >
+                Fechar e voltar ao site
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
