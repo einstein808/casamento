@@ -89,6 +89,11 @@ export default function AdminDashboardPage() {
   const [isSendingBatch, setIsSendingBatch] = useState(false);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
 
+  // WhatsApp Evolution Test Status
+  const [wppTestPhone, setWppTestPhone] = useState('');
+  const [isTestingWpp, setIsTestingWpp] = useState(false);
+  const [wppTestFeedback, setWppTestFeedback] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+
   // Custom WhatsApp Dispatch Modal
   const [activeDispatchGuest, setActiveDispatchGuest] = useState<Guest | null>(null);
   const [dispatchMessageType, setDispatchMessageType] = useState<'invite' | 'reminder' | 'reconfirmation'>('invite');
@@ -2982,6 +2987,85 @@ export default function AdminDashboardPage() {
                       className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8DCD5] text-xs sm:text-sm"
                     />
                   </div>
+                </div>
+
+                {/* Box de Teste da Conexão e Disparo */}
+                <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Testar Conexão e Disparar WhatsApp de Teste</span>
+                      </h4>
+                      <p className="text-[11px] text-emerald-800">
+                        Digite seu número com DDD (ex: 11999998888) para receber uma mensagem de validação imediata.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={wppTestPhone}
+                        onChange={(e) => setWppTestPhone(e.target.value)}
+                        placeholder="Seu telefone com DDD..."
+                        className="px-3 py-1.5 rounded-xl bg-white border border-emerald-300 text-xs w-48 focus:outline-none focus:border-emerald-600 text-[#2D2422]"
+                      />
+                      <button
+                        type="button"
+                        disabled={isTestingWpp}
+                        onClick={async () => {
+                          if (!settings.evolutionApiKey) {
+                            alert('Por favor, informe a API Key antes de testar.');
+                            return;
+                          }
+                          // Save settings first
+                          WeddingService.saveSettings(settings);
+                          setIsTestingWpp(true);
+                          setWppTestFeedback({ type: 'info', text: 'Testando conexão e disparando mensagem...' });
+
+                          try {
+                            const evolution = new EvolutionApiClient(settings);
+                            const result = await evolution.testConnection(wppTestPhone.trim() || undefined);
+
+                            if (result.success) {
+                              setWppTestFeedback({ type: 'success', text: `✅ ${result.message}` });
+                            } else {
+                              setWppTestFeedback({ type: 'error', text: `❌ ${result.message}` });
+                            }
+                          } catch (err: any) {
+                            setWppTestFeedback({ type: 'error', text: `❌ Erro: ${err.message}` });
+                          } finally {
+                            setIsTestingWpp(false);
+                          }
+                        }}
+                        className="px-4 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-all shrink-0 flex items-center gap-1.5 shadow-xs"
+                      >
+                        {isTestingWpp ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Enviando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Enviar Teste</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {wppTestFeedback && (
+                    <div className={`p-2.5 rounded-xl text-xs font-medium ${
+                      wppTestFeedback.type === 'success' 
+                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' 
+                        : wppTestFeedback.type === 'error'
+                        ? 'bg-red-50 text-red-800 border border-red-200'
+                        : 'bg-blue-50 text-blue-800 border border-blue-200'
+                    }`}>
+                      {wppTestFeedback.text}
+                    </div>
+                  )}
                 </div>
               </div>
 

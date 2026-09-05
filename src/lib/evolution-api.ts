@@ -89,55 +89,59 @@ export class EvolutionApiClient {
   private baseUrl: string;
   private instance: string;
   private apiKey: string;
+  private settings?: Partial<WeddingSettings>;
 
   constructor(settings?: Partial<WeddingSettings>) {
-    let endpoint = settings?.evolutionApiUrl || 
-                   process.env.NEXT_PUBLIC_WPP_API_URL || 
-                   process.env.NEXT_PUBLIC_EVOLUTION_API_URL || 
-                   'https://api.gabryelamaro.com/message/sendText/BarmanJF';
+    this.settings = settings;
 
-    this.apiKey = settings?.evolutionApiKey || 
-                  process.env.NEXT_PUBLIC_WPP_API_KEY || 
-                  process.env.NEXT_PUBLIC_EVOLUTION_API_KEY || 
-                  '';
+    let endpoint = (
+      settings?.evolutionApiUrl || 
+      process.env.NEXT_PUBLIC_WPP_API_URL || 
+      process.env.NEXT_PUBLIC_EVOLUTION_API_URL || 
+      'https://api.gabryelamaro.com'
+    ).trim();
 
-    this.instance = settings?.evolutionInstanceName || 
-                    process.env.NEXT_PUBLIC_EVOLUTION_INSTANCE || 
-                    'BarmanJF';
+    this.apiKey = (
+      settings?.evolutionApiKey || 
+      process.env.NEXT_PUBLIC_WPP_API_KEY || 
+      process.env.NEXT_PUBLIC_EVOLUTION_API_KEY || 
+      ''
+    ).trim();
+
+    let instanceName = (
+      settings?.evolutionInstanceName || 
+      process.env.NEXT_PUBLIC_EVOLUTION_INSTANCE || 
+      'BarmanJF'
+    ).trim();
 
     if (endpoint.includes('/message/sendText/')) {
       const parts = endpoint.split('/message/sendText/');
       this.baseUrl = parts[0].replace(/\/+$/, '');
-      if (parts[1]) {
-        this.instance = parts[1];
+      if (parts[1] && (!instanceName || instanceName === 'BarmanJF')) {
+        this.instance = parts[1].replace(/\/+$/, '').trim();
+      } else {
+        this.instance = instanceName;
       }
+    } else if (endpoint.includes('/message/sendText')) {
+      this.baseUrl = endpoint.replace('/message/sendText', '').replace(/\/+$/, '');
+      this.instance = instanceName;
     } else {
       this.baseUrl = endpoint.replace(/\/+$/, '');
+      this.instance = instanceName;
     }
   }
 
   public isConfigured(): boolean {
-    return Boolean(this.baseUrl && this.instance);
+    return Boolean(this.baseUrl && this.instance && this.apiKey);
   }
 
-  async simulateTypingPresence(number: string, durationMs: number = 2000): Promise<void> {
-    try {
-      const presenceEndpoint = `${this.baseUrl}/chat/sendPresence/${this.instance}`;
-      await fetch(presenceEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': this.apiKey,
-        },
-        body: JSON.stringify({
-          number,
-          presence: 'composing',
-          delay: durationMs,
-        }),
-      });
-    } catch {
-      // Non-blocking
-    }
+  public getConfigurationInfo() {
+    return {
+      baseUrl: this.baseUrl,
+      instance: this.instance,
+      hasApiKey: Boolean(this.apiKey),
+      isConfigured: this.isConfigured(),
+    };
   }
 
   async sendTextMessage(phone: string, text: string): Promise<EvolutionSendResponse> {
@@ -146,13 +150,48 @@ export class EvolutionApiClient {
       return { success: false, error: 'Número de telefone inválido ou incompleto.' };
     }
 
-    try {
-      await this.simulateTypingPresence(cleaned, 1500);
+    if (!this.apiKey) {
+      return { success: false, error: 'Chave de API (API Key) não informada. Preencha a API Key nas Configurações do painel e clique em Salvar.' };
+    }
 
-      const sendEndpoint = `${this.baseUrl}/message/sendText/${this.instance}`;
+    // Se estiver executando no navegador, redireciona para a API Route interna do Next.js para evitar bloqueio de CORS
+    if (typeof window !== 'undefined') {
+      try {
+        const response = await fetch('/api/whatsapp/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phone: cleaned,
+            message: text,
+            settings: this.settings,
+          }),
+        });
+
+        const data = await response.json();
+        return data;
+      } catch (err: any) {
+        return {
+          success: false,
+          error: err.message || 'Erro ao comunicar com o servidor interno do site.',
+        };
+      }
+    }
+
+    // Execução Server-Side (Node.js) - Sem restrições de CORS
+    try {
+      const sendEndpoint = `${this.baseUrl}/message/sendText/${encodeURIComponent(this.instance)}`;
       const sendPayload = {
         number: cleaned,
         text: text,
+        textMessage: {
+          text: text,
+        },
+        options: {
+          delay: 1200,
+          presence: 'composing',
+        },
       };
 
       const response = await fetch(sendEndpoint, {
@@ -160,6 +199,7 @@ export class EvolutionApiClient {
         headers: {
           'Content-Type': 'application/json',
           'apikey': this.apiKey,
+          'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify(sendPayload),
       });
@@ -168,26 +208,106 @@ export class EvolutionApiClient {
         const data = await response.json();
         return {
           success: true,
-          messageId: data?.key?.id || data?.messageId || 'sent',
+          messageId: data?.key?.id || data?.messageId || data?.id || 'sent',
         };
       } else {
         const errText = await response.text();
         let parsedErr = errText;
         try {
           const jsonErr = JSON.parse(errText);
-          parsedErr = jsonErr?.response?.message || jsonErr?.message || errText;
+          parsedErr = jsonErr?.response?.message?.[0] || 
+                      jsonErr?.response?.message || 
+                      jsonErr?.message || 
+                      jsonErr?.error || 
+                      errText;
+          if (Array.isArray(parsedErr)) {
+            parsedErr = parsedErr.join(', ');
+          }
         } catch {}
+
+        let help = '';
+        if (response.status === 401 || response.status === 403) {
+          help = ' (Chave de API inválida ou sem permissão na Evolution API)';
+        } else if (response.status === 404) {
+          help = ` (Instância "${this.instance}" não encontrada na Evolution API)`;
+        } else if (response.status === 400) {
+          help = ' (Verifique se o WhatsApp está conectado e se o número é válido com DDD)';
+        }
+
         return {
           success: false,
-          error: parsedErr || `Erro HTTP ${response.status}`,
+          error: `${parsedErr || `Erro HTTP ${response.status}`}${help}`,
         };
       }
     } catch (err: any) {
-      console.error('Erro ao enviar mensagem via Evolution API:', err);
+      console.error('Erro ao conectar com Evolution API:', err);
       return {
         success: false,
-        error: err.message || 'Falha de conexão com a Evolution API',
+        error: err.message || 'Falha ao conectar com o servidor da Evolution API.',
       };
+    }
+  }
+
+  /**
+   * Teste de conexão com envio de mensagem ou verificação de status
+   */
+  async testConnection(testPhone?: string): Promise<{ success: boolean; message: string }> {
+    if (!this.apiKey) {
+      return { success: false, message: 'API Key não configurada. Preencha o campo API Key e salve.' };
+    }
+    if (!this.instance) {
+      return { success: false, message: 'Nome da instância não configurado.' };
+    }
+    if (!this.baseUrl) {
+      return { success: false, message: 'URL da Evolution API não informada.' };
+    }
+
+    if (testPhone) {
+      const res = await this.sendTextMessage(
+        testPhone, 
+        '💍 *Teste de Conexão - Casamento*\n\n' +
+        'Olá! Esta é uma mensagem de teste enviada a partir do painel do seu site de casamento.\n\n' +
+        'Se você recebeu esta mensagem, sua integração com a *Evolution API (WhatsApp)* está 100% configurada e funcionando! 🚀✨'
+      );
+      if (res.success) {
+        return { success: true, message: 'Mensagem de teste enviada com sucesso para o WhatsApp!' };
+      } else {
+        return { success: false, message: `Falha ao enviar: ${res.error}` };
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/whatsapp/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ settings: this.settings }),
+        });
+        return await res.json();
+      } catch (e: any) {
+        return { success: false, message: e.message || 'Erro ao testar conexão' };
+      }
+    }
+
+    try {
+      const checkEndpoint = `${this.baseUrl}/instance/connectionState/${encodeURIComponent(this.instance)}`;
+      const res = await fetch(checkEndpoint, {
+        headers: {
+          'apikey': this.apiKey,
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const state = data?.instance?.state || data?.state || 'open';
+        return { success: true, message: `Instância "${this.instance}" conectada com sucesso! (Estado: ${state})` };
+      } else {
+        const txt = await res.text();
+        return { success: false, message: `Evolution API respondeu com erro (${res.status}): ${txt}` };
+      }
+    } catch (err: any) {
+      return { success: false, message: `Falha de rede ao conectar à Evolution API: ${err.message}` };
     }
   }
 
@@ -217,7 +337,7 @@ export class EvolutionApiClient {
   }
 
   /**
-   * 2. Lembrete de RSVP
+   * 2. Lembrete de Confirmação
    */
   async sendRsvpReminder(guest: Guest, settings: WeddingSettings, baseUrl: string, customTemplate?: string): Promise<EvolutionSendResponse> {
     if (!guest.phone) {
