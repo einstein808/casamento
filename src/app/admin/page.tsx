@@ -38,9 +38,10 @@ import {
   Pencil,
   PackageCheck
 } from 'lucide-react';
-import { Guest, GuestMetrics, WeddingSettings, Gift as GiftType, PixContribution, GuestPhoto, StoryMilestone, ThemeColors, SectionId, GuestChecklistItem } from '@/lib/types';
+import { Guest, GuestStatus, Companion, GuestMetrics, WeddingSettings, Gift as GiftType, PixContribution, GuestPhoto, StoryMilestone, ThemeColors, SectionId, GuestChecklistItem } from '@/lib/types';
 import { WeddingService } from '@/lib/wedding-service';
 import { EvolutionApiClient, interpolateWeddingMessage } from '@/lib/evolution-api';
+import { generatePixPayload, generatePixQrCode } from '@/lib/pix';
 import { THEME_PRESETS } from '@/lib/themes';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { compressImage } from '@/lib/image-cache';
@@ -64,11 +65,18 @@ export default function AdminDashboardPage() {
   const [guestSearch, setGuestSearch] = useState('');
   const [guestFilter, setGuestFilter] = useState<'all' | 'confirmed' | 'reconfirmed' | 'pending' | 'declined' | 'attended'>('all');
   
-  // Modals
-  const [showAddGuestModal, setShowAddGuestModal] = useState(false);
-  const [newGuestName, setNewGuestName] = useState('');
-  const [newGuestPhone, setNewGuestPhone] = useState('');
-  const [newGuestCompanions, setNewGuestCompanions] = useState(0);
+  // Guest Modal States (Add & Edit)
+  const [showGuestModal, setShowGuestModal] = useState(false);
+  const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
+  const [guestFormName, setGuestFormName] = useState('');
+  const [guestFormPhone, setGuestFormPhone] = useState('');
+  const [guestFormSlug, setGuestFormSlug] = useState('');
+  const [guestFormCompanions, setGuestFormCompanions] = useState(0);
+  const [guestFormStatus, setGuestFormStatus] = useState<GuestStatus>('pending');
+  const [guestFormConfirmedCompanions, setGuestFormConfirmedCompanions] = useState<Companion[]>([]);
+  const [guestFormDietRestrictions, setGuestFormDietRestrictions] = useState('');
+  const [guestFormMessage, setGuestFormMessage] = useState('');
+  const [guestFormAttendedOnDay, setGuestFormAttendedOnDay] = useState(false);
 
   const [showAddGiftModal, setShowAddGiftModal] = useState(false);
   const [editingGift, setEditingGift] = useState<GiftType | null>(null);
@@ -93,6 +101,13 @@ export default function AdminDashboardPage() {
   const [wppTestPhone, setWppTestPhone] = useState('');
   const [isTestingWpp, setIsTestingWpp] = useState(false);
   const [wppTestFeedback, setWppTestFeedback] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+
+  // PIX Live Test Status
+  const [pixTestAmount, setPixTestAmount] = useState('1.00');
+  const [pixTestQrCode, setPixTestQrCode] = useState<string | null>(null);
+  const [pixTestPayload, setPixTestPayload] = useState<string | null>(null);
+  const [pixTestCopied, setPixTestCopied] = useState(false);
+  const [isGeneratingPixTest, setIsGeneratingPixTest] = useState(false);
 
   // Custom WhatsApp Dispatch Modal
   const [activeDispatchGuest, setActiveDispatchGuest] = useState<Guest | null>(null);
@@ -224,21 +239,84 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleAddGuest = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newGuestName.trim()) return;
+  const handleOpenAddGuest = () => {
+    setEditingGuest(null);
+    setGuestFormName('');
+    setGuestFormPhone('');
+    setGuestFormSlug('');
+    setGuestFormCompanions(0);
+    setGuestFormStatus('pending');
+    setGuestFormConfirmedCompanions([]);
+    setGuestFormDietRestrictions('');
+    setGuestFormMessage('');
+    setGuestFormAttendedOnDay(false);
+    setShowGuestModal(true);
+  };
 
-    WeddingService.saveGuest({
-      name: newGuestName.trim(),
-      phone: newGuestPhone.trim(),
-      maxCompanions: Number(newGuestCompanions) || 0,
-      status: 'pending',
+  const handleOpenEditGuest = (guest: Guest) => {
+    setEditingGuest(guest);
+    setGuestFormName(guest.name || '');
+    setGuestFormPhone(guest.phone || '');
+    setGuestFormSlug(guest.slug || '');
+    setGuestFormCompanions(guest.maxCompanions ?? 0);
+    setGuestFormStatus(guest.status || 'pending');
+    setGuestFormConfirmedCompanions(
+      guest.confirmedCompanions && Array.isArray(guest.confirmedCompanions)
+        ? JSON.parse(JSON.stringify(guest.confirmedCompanions))
+        : []
+    );
+    setGuestFormDietRestrictions(guest.dietRestrictions || '');
+    setGuestFormMessage(guest.message || '');
+    setGuestFormAttendedOnDay(!!guest.attendedOnDay);
+    setShowGuestModal(true);
+  };
+
+  const handleAddCompanionToGuest = () => {
+    setGuestFormConfirmedCompanions(prev => [...prev, { name: '', isChild: false }]);
+  };
+
+  const handleUpdateCompanion = (index: number, field: 'name' | 'isChild', value: any) => {
+    setGuestFormConfirmedCompanions(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
     });
+  };
 
-    setNewGuestName('');
-    setNewGuestPhone('');
-    setNewGuestCompanions(0);
-    setShowAddGuestModal(false);
+  const handleRemoveCompanionFromGuest = (index: number) => {
+    setGuestFormConfirmedCompanions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveGuest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!guestFormName.trim()) return;
+
+    const cleanCompanions = guestFormConfirmedCompanions
+      .map(c => ({ name: c.name.trim(), isChild: !!c.isChild }))
+      .filter(c => c.name !== '');
+
+    const guestPayload: Partial<Guest> & { name: string } = {
+      ...(editingGuest ? { id: editingGuest.id } : {}),
+      name: guestFormName.trim(),
+      phone: guestFormPhone.trim(),
+      slug: guestFormSlug.trim() || undefined,
+      maxCompanions: Number(guestFormCompanions) || 0,
+      status: guestFormStatus,
+      confirmedCompanions: (guestFormStatus === 'confirmed' || guestFormStatus === 'reconfirmed') ? cleanCompanions : [],
+      dietRestrictions: guestFormDietRestrictions.trim(),
+      message: guestFormMessage.trim(),
+      attendedOnDay: guestFormAttendedOnDay,
+    };
+
+    if (editingGuest) {
+      if (guestFormStatus === 'reconfirmed' && !editingGuest.reconfirmedAt) {
+        guestPayload.reconfirmedAt = new Date().toISOString();
+      }
+    }
+
+    await WeddingService.saveGuestAsync(guestPayload);
+    setShowGuestModal(false);
+    setEditingGuest(null);
     reloadAll();
   };
 
@@ -247,9 +325,16 @@ export default function AdminDashboardPage() {
     reloadAll();
   };
 
-  const handleDeleteGuest = (guestId: string) => {
+  const handleDeleteGuest = async (guestId: string) => {
     if (confirm('Tem certeza que deseja remover este convidado da lista?')) {
-      WeddingService.deleteGuest(guestId);
+      await WeddingService.deleteGuestAsync(guestId);
+      reloadAll();
+    }
+  };
+
+  const handleDeletePixContribution = async (id: string) => {
+    if (confirm('Tem certeza que deseja excluir este registro do histórico de presentes/PIX?')) {
+      await WeddingService.deletePixContributionAsync(id);
       reloadAll();
     }
   };
@@ -870,10 +955,20 @@ export default function AdminDashboardPage() {
                     </p>
                   ) : (
                     pixLogs.slice().reverse().map((log) => (
-                      <div key={log.id} className="py-3 space-y-1">
+                      <div key={log.id} className="py-3 space-y-1 group relative">
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-bold text-[#2D2422]">{log.guestName}</span>
-                          <span className="font-semibold text-emerald-700">{formatCurrency(log.amount)}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-emerald-700">{formatCurrency(log.amount)}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePixContribution(log.id)}
+                              className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                              title="Excluir este presente/PIX de teste"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                         <p className="text-xs text-[#C2847A] font-medium">{log.giftTitle}</p>
                         {log.message && (
@@ -2207,7 +2302,7 @@ export default function AdminDashboardPage() {
                 </button>
 
                 <button
-                  onClick={() => setShowAddGuestModal(true)}
+                  onClick={handleOpenAddGuest}
                   className="px-3.5 py-2 rounded-xl bg-[#C2847A] text-white text-xs font-semibold hover:bg-[#B07065] transition-colors flex items-center gap-1.5 shadow-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -2433,13 +2528,22 @@ export default function AdminDashboardPage() {
                           </td>
 
                           <td className="py-3.5 px-4 text-right">
-                            <button
-                              onClick={() => handleDeleteGuest(guest.id)}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                              title="Excluir Convidado"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => handleOpenEditGuest(guest)}
+                                className="p-1.5 rounded-lg text-[#6B5A55] hover:text-[#C2847A] hover:bg-[#FAF3EE] transition-colors"
+                                title="Editar Convidado"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteGuest(guest.id)}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                title="Excluir Convidado"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -2519,11 +2623,13 @@ export default function AdminDashboardPage() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => {
-                            WeddingService.clearGiftReservation(gift.id);
-                            reloadAll();
+                          onClick={async () => {
+                            if (confirm(`Deseja liberar o presente "${gift.title}" para que outros convidados possam escolher?`)) {
+                              await WeddingService.clearGiftReservationAsync(gift.id);
+                              reloadAll();
+                            }
                           }}
-                          className="text-[10px] text-red-600 hover:underline font-semibold"
+                          className="px-2 py-0.5 rounded bg-red-100 text-red-700 hover:bg-red-200 text-[10px] font-bold transition-colors"
                         >
                           Liberar
                         </button>
@@ -2573,11 +2679,12 @@ export default function AdminDashboardPage() {
                       <th className="py-3 px-4">Valor Estimado</th>
                       <th className="py-3 px-4">Mensagem de Carinho</th>
                       <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {pixLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-[#FAF3EE]/30">
+                      <tr key={log.id} className="hover:bg-[#FAF3EE]/30 transition-colors">
                         <td className="py-3 px-4 text-[#8D7B75]">{new Date(log.createdAt).toLocaleDateString('pt-BR')}</td>
                         <td className="py-3 px-4 font-bold">
                           {log.guestName}
@@ -2601,6 +2708,16 @@ export default function AdminDashboardPage() {
                           <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
                             Confirmado
                           </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePixContribution(log.id)}
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Excluir este presente/PIX de teste"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -2981,6 +3098,142 @@ export default function AdminDashboardPage() {
                     />
                   </div>
                 </div>
+
+                {/* Box de Teste do PIX e Visualização do QR Code */}
+                <div className="p-4 rounded-2xl bg-[#FAF3EE]/80 border border-[#EADBCE] space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-[#2D2422] flex items-center gap-1.5">
+                        <QrCode className="w-4 h-4 text-[#C2847A]" />
+                        <span>Testar e Visualizar QR Code PIX em Tempo Real</span>
+                      </h4>
+                      <p className="text-[11px] text-[#8D7B75]">
+                        Gere o QR Code com a chave configurada acima e aponte a câmera do aplicativo do seu banco para validar o recebimento.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#8D7B75]">R$</span>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={pixTestAmount}
+                          onChange={(e) => setPixTestAmount(e.target.value)}
+                          placeholder="Valor do teste..."
+                          className="pl-8 pr-3 py-1.5 rounded-xl bg-white border border-[#E8DCD5] text-xs w-28 font-bold focus:outline-none focus:border-[#C2847A]"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isGeneratingPixTest || !settings.pixKey}
+                        onClick={async () => {
+                          if (!settings.pixKey.trim()) {
+                            alert('Informe a Chave PIX antes de testar.');
+                            return;
+                          }
+                          // Save settings first
+                          WeddingService.saveSettings(settings);
+                          setIsGeneratingPixTest(true);
+                          try {
+                            const val = parseFloat(pixTestAmount);
+                            const amountToUse = isNaN(val) || val <= 0 ? 0 : val;
+                            const payload = generatePixPayload({
+                              pixKey: settings.pixKey,
+                              merchantName: settings.pixMerchantName || 'CASAMENTO',
+                              merchantCity: settings.pixMerchantCity || 'SAO PAULO',
+                              amount: amountToUse,
+                            });
+                            setPixTestPayload(payload);
+                            const qrUrl = await generatePixQrCode(payload);
+                            setPixTestQrCode(qrUrl);
+                          } catch (e: any) {
+                            alert(`Erro ao gerar PIX de teste: ${e.message}`);
+                          } finally {
+                            setIsGeneratingPixTest(false);
+                          }
+                        }}
+                        className="px-4 py-1.5 rounded-xl bg-[#C2847A] text-white text-xs font-semibold hover:bg-[#B07065] disabled:opacity-50 transition-all shrink-0 flex items-center gap-1.5 shadow-xs"
+                      >
+                        {isGeneratingPixTest ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Gerando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Gerar / Testar QR Code</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {pixTestQrCode && pixTestPayload && (
+                    <div className="p-4 rounded-2xl bg-white border border-[#EADBCE] flex flex-col sm:flex-row items-center gap-5 animate-in zoom-in-95 duration-200">
+                      <div className="p-2.5 bg-[#FAF3EE] rounded-2xl border border-[#EADBCE] shrink-0 text-center">
+                        <img
+                          src={pixTestQrCode}
+                          alt="QR Code de Teste PIX"
+                          className="w-40 h-40 rounded-xl mx-auto shadow-xs"
+                        />
+                        <p className="text-[10px] text-[#8D7B75] mt-1.5 font-medium">
+                          {parseFloat(pixTestAmount) > 0 ? formatCurrency(parseFloat(pixTestAmount)) : 'Valor Aberto no Banco'}
+                        </p>
+                      </div>
+
+                      <div className="flex-1 space-y-2.5 w-full text-left">
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-bold text-[#2D2422] flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>QR Code Gerado com Sucesso no Padrão BACEN / BR Code</span>
+                          </span>
+                          <p className="text-xs text-[#8D7B75]">
+                            Titular: <strong>{settings.pixMerchantName || 'Não informado'}</strong> • Cidade: <strong>{settings.pixMerchantCity || 'SAO PAULO'}</strong>
+                          </p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="block text-[10px] uppercase font-bold text-[#8D7B75]">
+                            Código PIX Copia e Cola para Teste:
+                          </label>
+                          <div className="flex items-center gap-2 p-2 rounded-xl bg-[#FDFBF7] border border-[#E8DCD5]">
+                            <input
+                              type="text"
+                              readOnly
+                              value={pixTestPayload}
+                              className="flex-1 bg-transparent text-[11px] text-[#6B5A55] font-mono focus:outline-none overflow-hidden text-ellipsis"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(pixTestPayload);
+                                setPixTestCopied(true);
+                                setTimeout(() => setPixTestCopied(false), 2500);
+                              }}
+                              className="shrink-0 px-3 py-1 rounded-lg bg-[#2D2422] text-white text-xs font-semibold hover:bg-black transition-colors flex items-center gap-1"
+                            >
+                              {pixTestCopied ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                  <span>Copiado!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copiar</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Evolution API Settings */}
@@ -3197,66 +3450,233 @@ export default function AdminDashboardPage() {
         )}
       </main>
 
-      {/* MODAL: Adicionar Convidado */}
-      {showAddGuestModal && (
+      {/* MODAL: Adicionar / Editar Convidado */}
+      {showGuestModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl border border-[#F0E6DF]">
-            <h3 className="font-serif text-xl font-medium text-[#2D2422]">
-              Adicionar Novo Convidado
-            </h3>
-
-            <form onSubmit={handleAddGuest} className="space-y-4">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl border border-[#F0E6DF] max-h-[92vh] flex flex-col justify-between overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
               <div>
-                <label className="block text-xs uppercase font-semibold text-[#8D7B75] mb-1">Nome Completo do Titular *</label>
+                <h3 className="font-serif text-xl font-medium text-[#2D2422]">
+                  {editingGuest ? 'Editar Convidado' : 'Adicionar Novo Convidado'}
+                </h3>
+                <p className="text-xs text-[#8D7B75]">
+                  {editingGuest ? `Modifique os dados, status ou acompanhantes de ${editingGuest.name}` : 'Cadastre um novo convidado e gere seu link exclusivo'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowGuestModal(false);
+                  setEditingGuest(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGuest} className="space-y-4">
+              {/* Nome do Convidado */}
+              <div>
+                <label className="block text-xs uppercase font-semibold text-[#8D7B75] mb-1">
+                  Nome Completo do Titular *
+                </label>
                 <input
                   type="text"
                   required
-                  value={newGuestName}
-                  onChange={(e) => setNewGuestName(e.target.value)}
+                  value={guestFormName}
+                  onChange={(e) => setGuestFormName(e.target.value)}
                   placeholder="Ex: Mariana Castro Silva"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8DCD5] text-xs sm:text-sm focus:outline-none focus:border-[#C2847A]"
                 />
               </div>
 
+              {/* Telefone & Link/Slug */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs uppercase font-semibold text-[#8D7B75] mb-1">
+                    WhatsApp / Telefone (com DDD)
+                  </label>
+                  <input
+                    type="text"
+                    value={guestFormPhone}
+                    onChange={(e) => setGuestFormPhone(e.target.value)}
+                    placeholder="Ex: 11987654321"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8DCD5] text-xs sm:text-sm focus:outline-none focus:border-[#C2847A]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase font-semibold text-[#8D7B75] mb-1">
+                    Link / Slug do Convite
+                  </label>
+                  <input
+                    type="text"
+                    value={guestFormSlug}
+                    onChange={(e) => setGuestFormSlug(e.target.value)}
+                    placeholder="mariana-castro-silva"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8DCD5] text-xs sm:text-sm focus:outline-none focus:border-[#C2847A]"
+                  />
+                </div>
+              </div>
+
+              {/* Status de Presença & Acompanhantes Permitidos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs uppercase font-semibold text-[#8D7B75] mb-1">
+                    Status de Presença
+                  </label>
+                  <select
+                    value={guestFormStatus}
+                    onChange={(e) => setGuestFormStatus(e.target.value as GuestStatus)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8DCD5] text-xs sm:text-sm focus:outline-none focus:border-[#C2847A] font-medium"
+                  >
+                    <option value="pending">⏰ Pendente (Aguardando resposta)</option>
+                    <option value="confirmed">✅ Confirmado</option>
+                    <option value="reconfirmed">✨ Reconfirmado (Definitivo Pré-Evento)</option>
+                    <option value="declined">❌ Não comparecerá (Recusou)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase font-semibold text-[#8D7B75] mb-1">
+                    Acompanhantes Permitidos
+                  </label>
+                  <select
+                    value={guestFormCompanions}
+                    onChange={(e) => setGuestFormCompanions(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8DCD5] text-xs sm:text-sm focus:outline-none focus:border-[#C2847A]"
+                  >
+                    <option value={0}>0 (Apenas o titular)</option>
+                    <option value={1}>+1 acompanhante (Casal / Dupla)</option>
+                    <option value={2}>+2 acompanhantes</option>
+                    <option value={3}>+3 acompanhantes (Família)</option>
+                    <option value={4}>+4 acompanhantes</option>
+                    <option value={5}>+5 acompanhantes</option>
+                    <option value={6}>+6 acompanhantes</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Lista de Acompanhantes Confirmados */}
+              {(guestFormStatus === 'confirmed' || guestFormStatus === 'reconfirmed' || guestFormConfirmedCompanions.length > 0) && (
+                <div className="p-3.5 bg-[#FAF3EE] rounded-2xl border border-[#E8DCD5] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-[#2D2422]">
+                        Acompanhantes Confirmados ({guestFormConfirmedCompanions.length})
+                      </p>
+                      <p className="text-[10px] text-[#8D7B75]">
+                        Nomes dos acompanhantes que irão junto com este convidado
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddCompanionToGuest}
+                      className="px-2.5 py-1 rounded-lg bg-[#C2847A] text-white text-[11px] font-semibold hover:bg-[#B07065] flex items-center gap-1 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Adicionar</span>
+                    </button>
+                  </div>
+
+                  {guestFormConfirmedCompanions.length === 0 ? (
+                    <p className="text-xs text-gray-500 italic text-center py-2">
+                      Nenhum acompanhante cadastrado ainda.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                      {guestFormConfirmedCompanions.map((comp, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-white p-2 rounded-xl border border-[#E8DCD5]">
+                          <input
+                            type="text"
+                            value={comp.name}
+                            onChange={(e) => handleUpdateCompanion(idx, 'name', e.target.value)}
+                            placeholder={`Nome do acompanhante ${idx + 1}`}
+                            className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-[#C2847A]"
+                          />
+                          <label className="flex items-center gap-1 text-[11px] text-[#6B5A55] whitespace-nowrap cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!!comp.isChild}
+                              onChange={(e) => handleUpdateCompanion(idx, 'isChild', e.target.checked)}
+                              className="rounded text-[#C2847A] focus:ring-0"
+                            />
+                            Criança
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCompanionFromGuest(idx)}
+                            className="p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Remover acompanhante"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Restrições Alimentares */}
               <div>
-                <label className="block text-xs uppercase font-semibold text-[#8D7B75] mb-1">WhatsApp / Telefone (com DDD)</label>
+                <label className="block text-xs uppercase font-semibold text-[#8D7B75] mb-1">
+                  Restrições Alimentares / Observações
+                </label>
                 <input
                   type="text"
-                  value={newGuestPhone}
-                  onChange={(e) => setNewGuestPhone(e.target.value)}
-                  placeholder="Ex: 11987654321"
+                  value={guestFormDietRestrictions}
+                  onChange={(e) => setGuestFormDietRestrictions(e.target.value)}
+                  placeholder="Ex: Vegetariano, intolerância a lactose..."
                   className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8DCD5] text-xs sm:text-sm focus:outline-none focus:border-[#C2847A]"
                 />
               </div>
 
+              {/* Mensagem / Recado */}
               <div>
-                <label className="block text-xs uppercase font-semibold text-[#8D7B75] mb-1">Acompanhantes Permitidos</label>
-                <select
-                  value={newGuestCompanions}
-                  onChange={(e) => setNewGuestCompanions(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8DCD5] text-xs sm:text-sm focus:outline-none focus:border-[#C2847A]"
-                >
-                  <option value={0}>0 (Apenas o titular)</option>
-                  <option value={1}>+1 acompanhante (Casal / Dupla)</option>
-                  <option value={2}>+2 acompanhantes</option>
-                  <option value={3}>+3 acompanhantes (Família)</option>
-                  <option value={4}>+4 acompanhantes (Família grande)</option>
-                </select>
+                <label className="block text-xs uppercase font-semibold text-[#8D7B75] mb-1">
+                  Mensagem / Recado para os Noivos
+                </label>
+                <textarea
+                  rows={2}
+                  value={guestFormMessage}
+                  onChange={(e) => setGuestFormMessage(e.target.value)}
+                  placeholder="Recado carinhoso deixado pelo convidado..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-[#E8DCD5] text-xs focus:outline-none focus:border-[#C2847A]"
+                />
               </div>
 
-              <div className="flex gap-3 pt-2">
+              {/* Check-in no Casamento */}
+              <div className="pt-1">
+                <label className="flex items-center gap-2 p-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold text-[#2D2422] cursor-pointer hover:bg-gray-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={guestFormAttendedOnDay}
+                    onChange={(e) => setGuestFormAttendedOnDay(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-0"
+                  />
+                  <span>🎉 Presente no dia do casamento (Check-in realizado)</span>
+                </label>
+              </div>
+
+              {/* Botões de Ação */}
+              <div className="flex gap-3 pt-3 border-t">
                 <button
                   type="button"
-                  onClick={() => setShowAddGuestModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200"
+                  onClick={() => {
+                    setShowGuestModal(false);
+                    setEditingGuest(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-[#C2847A] text-white text-xs font-semibold hover:bg-[#B07065] shadow-xs"
+                  className="flex-1 py-2.5 rounded-xl bg-[#C2847A] text-white text-xs font-semibold hover:bg-[#B07065] shadow-xs transition-colors"
                 >
-                  Salvar Convidado
+                  {editingGuest ? 'Salvar Alterações' : 'Cadastrar Convidado'}
                 </button>
               </div>
             </form>

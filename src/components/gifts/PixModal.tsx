@@ -36,7 +36,8 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [guestMessage, setGuestMessage] = useState('');
-  const [customAmount, setCustomAmount] = useState<number>(0);
+  const [customAmount, setCustomAmount] = useState<number>(100);
+  const [isOpenAmount, setIsOpenAmount] = useState<boolean>(false);
   const [guestList, setGuestList] = useState<Guest[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   
@@ -55,7 +56,13 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
       setGuestMessage('');
       setCopied(false);
       setErrorMsg('');
-      setCustomAmount(gift?.price || 100);
+      if (gift?.id === 'custom-amount' || !gift?.price || gift.price <= 0) {
+        setIsOpenAmount(true);
+        setCustomAmount(0);
+      } else {
+        setIsOpenAmount(false);
+        setCustomAmount(gift.price);
+      }
       setGuestList(WeddingService.getGuests());
       WeddingService.syncAllFromCloud().then(() => {
         setGuestList(WeddingService.getGuests());
@@ -65,7 +72,7 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
 
   if (!isOpen || !gift) return null;
 
-  const finalAmount = gift.price > 0 ? gift.price : (customAmount || 100);
+  const finalAmount = isOpenAmount ? 0 : (customAmount || gift.price || 0);
   const isPhysicalAlreadyReserved = Boolean(gift.reservedInPerson);
 
   const filteredGuestSuggestions = guestName.trim().length > 1
@@ -102,7 +109,7 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
       const payload = generatePixPayload({
         pixKey: settings.pixKey,
         merchantName: settings.pixMerchantName || `${settings.brideName} e ${settings.groomName}`,
-        merchantCity: settings.pixMerchantCity || 'BRASIL',
+        merchantCity: settings.pixMerchantCity || 'SAO PAULO',
         amount: finalAmount,
         description: `Presente: ${gift.title.slice(0, 20)}`,
       });
@@ -113,6 +120,7 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
       setStep('pix');
     } catch (err) {
       console.error('Erro ao gerar PIX:', err);
+      setErrorMsg('Erro ao gerar QR Code do PIX. Verifique a chave PIX nas configurações.');
     } finally {
       setIsGenerating(false);
     }
@@ -123,11 +131,12 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
       gift.id, 
       guestName.trim(), 
       guestPhone.trim(), 
-      guestMessage.trim()
+      guestMessage.trim(),
+      finalAmount
     );
 
     if (!res.success) {
-      setErrorMsg(res.error || 'Não foi possível reservar este item.');
+      setErrorMsg(res.error || 'Não foi possível registrar esta opção.');
       setStep('form');
       return;
     }
@@ -294,6 +303,84 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
                 )}
               </div>
 
+              {/* PIX Amount Customizer (Client can freely choose or adjust the amount) */}
+              {method === 'pix' && (
+                <div className="space-y-2 p-4 rounded-2xl bg-[#FAF3EE]/80 border border-[#EADBCE] animate-in fade-in duration-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="block text-xs uppercase tracking-wider text-[#2D2422] font-bold">
+                      Valor do Presente (PIX):
+                    </label>
+                    <span className="text-[11px] text-[#C2847A] font-medium">
+                      Você pode escolher ou digitar qualquer valor
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-[#8D7B75]">
+                      R$
+                    </span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="any"
+                      disabled={isOpenAmount}
+                      value={isOpenAmount ? '' : customAmount || ''}
+                      onChange={(e) => {
+                        setIsOpenAmount(false);
+                        const val = parseFloat(e.target.value);
+                        setCustomAmount(isNaN(val) ? 0 : val);
+                      }}
+                      placeholder={isOpenAmount ? "Valor livre a definir no App do seu Banco" : "Digite o valor desejado..."}
+                      className={`w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-[#E8DCD5] text-sm font-bold text-[#2D2422] focus:outline-none focus:border-[#C2847A] ${
+                        isOpenAmount ? 'bg-emerald-50/50 border-emerald-300 placeholder:font-normal placeholder:text-emerald-800' : ''
+                      }`}
+                    />
+                  </div>
+
+                  {/* Preset Quick Chips */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    {gift.price > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => { setIsOpenAmount(false); setCustomAmount(gift.price); }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                          !isOpenAmount && customAmount === gift.price
+                            ? 'bg-[#C2847A] text-white border-[#C2847A] shadow-xs'
+                            : 'bg-white text-[#6B5A55] border-[#E8DCD5] hover:border-[#C2847A]'
+                        }`}
+                      >
+                        Sugerido ({formatCurrency(gift.price)})
+                      </button>
+                    )}
+                    {[50, 100, 150, 200, 300, 500].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => { setIsOpenAmount(false); setCustomAmount(val); }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                          !isOpenAmount && customAmount === val
+                            ? 'bg-[#C2847A] text-white border-[#C2847A] shadow-xs'
+                            : 'bg-white text-[#6B5A55] border-[#E8DCD5] hover:border-[#C2847A]'
+                        }`}
+                      >
+                        R$ {val}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => { setIsOpenAmount(true); setCustomAmount(0); }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                        isOpenAmount
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-50'
+                      }`}
+                    >
+                      ✨ Digitar no App do Banco
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Guest name with suggestions */}
               <div className="space-y-1.5 relative">
                 <label className="block text-xs uppercase tracking-wider text-[#8D7B75] font-semibold">
@@ -397,10 +484,18 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
               <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 space-y-2">
                 <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-amber-800">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Dupla Confirmação de Reserva</span>
+                  <span>Dupla Confirmação de Entrega</span>
                 </div>
                 <p className="text-xs leading-relaxed text-amber-900">
-                  Ao confirmar, este presente será <strong>imediatamente bloqueado e ocultado do site</strong> para que nenhum outro convidado escolha ou compre o mesmo item repetido.
+                  {gift.id === 'custom-amount' ? (
+                    <span>
+                      Ao confirmar, você registrará seu carinho e intenção de presentear os noivos pessoalmente no dia do casamento (esta opção continuará sempre disponível para outros convidados).
+                    </span>
+                  ) : (
+                    <span>
+                      Ao confirmar, este presente será <strong>imediatamente bloqueado e ocultado do site</strong> para que nenhum outro convidado escolha ou compre o mesmo item repetido.
+                    </span>
+                  )}
                 </p>
               </div>
 
@@ -410,12 +505,14 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
                   <img src={gift.imageUrl} alt={gift.title} className="w-14 h-14 rounded-xl object-cover" />
                   <div>
                     <h4 className="font-semibold text-sm text-[#2D2422]">{gift.title}</h4>
-                    <p className="text-xs text-[#C2847A] font-bold">{formatCurrency(finalAmount)}</p>
+                    {gift.id !== 'custom-amount' && (
+                      <p className="text-xs text-[#C2847A] font-bold">{formatCurrency(finalAmount)}</p>
+                    )}
                   </div>
                 </div>
 
                 <div className="pt-2 border-t border-[#EADBCE] text-xs text-[#6B5A55] space-y-1">
-                  <p><strong>Quem vai levar:</strong> {guestName}</p>
+                  <p><strong>Quem vai entregar:</strong> {guestName}</p>
                   {guestPhone && <p><strong>Telefone / WhatsApp:</strong> {guestPhone}</p>}
                   <p><strong>Modalidade:</strong> Entrega física pessoalmente no dia do casamento</p>
                 </div>
@@ -428,7 +525,11 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-sm shadow-md hover:shadow-lg hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <PackageCheck className="w-5 h-5" />
-                  <span>Sim, confirmo que vou comprar e levar este presente!</span>
+                  <span>
+                    {gift.id === 'custom-amount' 
+                      ? 'Sim, confirmo que vou entregar pessoalmente no dia!'
+                      : 'Sim, confirmo que vou comprar e levar este presente!'}
+                  </span>
                 </button>
 
                 <button
@@ -449,7 +550,7 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
                   Quase lá! Escaneie ou Copie o PIX
                 </span>
                 <h4 className="font-serif text-xl font-medium text-[#2D2422]">
-                  {formatCurrency(finalAmount)}
+                  {finalAmount > 0 ? formatCurrency(finalAmount) : 'Valor Livre (Defina no App do seu Banco)'}
                 </h4>
                 <p className="text-xs text-[#8D7B75]">
                   Destinatário: <span className="font-semibold">{settings.pixMerchantName || `${settings.brideName} e ${settings.groomName}`}</span>

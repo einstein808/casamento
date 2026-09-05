@@ -50,6 +50,23 @@ function setLocalItem<T>(key: string, value: T): void {
   }
 }
 
+function sanitizeForFirestore<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForFirestore(item)) as any;
+  }
+  if (typeof obj === 'object') {
+    const clean: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        clean[key] = sanitizeForFirestore(value);
+      }
+    }
+    return clean;
+  }
+  return obj;
+}
+
 export class WeddingService {
   // --- CLOUD SYNC (Firebase Firestore) ---
   static async syncAllFromCloud(): Promise<boolean> {
@@ -240,7 +257,7 @@ export class WeddingService {
   static saveSettings(settings: WeddingSettings): WeddingSettings {
     setLocalItem(STORAGE_KEYS.SETTINGS, settings);
     if (db) {
-      setDoc(doc(db, COLLECTIONS.SETTINGS, 'main_settings'), settings).catch(err => {
+      setDoc(doc(db, COLLECTIONS.SETTINGS, 'main_settings'), sanitizeForFirestore(settings)).catch(err => {
         console.warn('Erro ao persistir settings no Firestore:', err);
       });
     }
@@ -260,14 +277,26 @@ export class WeddingService {
 
   static saveGuest(guest: Partial<Guest> & { name: string }): Guest {
     const guests = this.getGuests();
-    const slug = guest.slug || guest.name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)+/g, '');
-
     const existingIndex = guests.findIndex(g => g.id === guest.id || (guest.id && g.id === guest.id));
+
+    let slug = guest.slug;
+    if (slug) {
+      slug = slug
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
+    } else if (existingIndex >= 0 && guests[existingIndex].slug) {
+      slug = guests[existingIndex].slug;
+    } else {
+      slug = guest.name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
+    }
 
     let finalGuest: Guest;
 
@@ -292,7 +321,7 @@ export class WeddingService {
         dietRestrictions: guest.dietRestrictions || '',
         message: guest.message || '',
         reminderCount: 0,
-        attendedOnDay: false,
+        attendedOnDay: guest.attendedOnDay ?? false,
         createdAt: new Date().toISOString(),
       };
       guests.push(finalGuest);
@@ -301,7 +330,7 @@ export class WeddingService {
     setLocalItem(STORAGE_KEYS.GUESTS, guests);
 
     if (db) {
-      setDoc(doc(db, COLLECTIONS.GUESTS, finalGuest.id), finalGuest).catch(console.warn);
+      setDoc(doc(db, COLLECTIONS.GUESTS, finalGuest.id), sanitizeForFirestore(finalGuest)).catch(console.warn);
     }
 
     return finalGuest;
@@ -311,7 +340,7 @@ export class WeddingService {
     const saved = this.saveGuest(guest);
     if (db) {
       try {
-        await setDoc(doc(db, COLLECTIONS.GUESTS, saved.id), saved);
+        await setDoc(doc(db, COLLECTIONS.GUESTS, saved.id), sanitizeForFirestore(saved));
       } catch (e) {
         console.warn('Erro ao salvar guest no Firestore:', e);
       }
@@ -336,17 +365,22 @@ export class WeddingService {
       ...guests[index],
       status: isReconfirm ? 'reconfirmed' : status,
       confirmedCompanions: (status === 'confirmed' || isReconfirm) ? confirmedCompanions : [],
-      dietRestrictions,
-      message,
-      reconfirmedAt: isReconfirm ? new Date().toISOString() : guests[index].reconfirmedAt,
+      dietRestrictions: dietRestrictions || '',
+      message: message || '',
       updatedAt: new Date().toISOString(),
     };
+
+    if (isReconfirm) {
+      updatedGuest.reconfirmedAt = new Date().toISOString();
+    } else if (guests[index].reconfirmedAt) {
+      updatedGuest.reconfirmedAt = guests[index].reconfirmedAt;
+    }
 
     guests[index] = updatedGuest;
     setLocalItem(STORAGE_KEYS.GUESTS, guests);
 
     if (db) {
-      setDoc(doc(db, COLLECTIONS.GUESTS, updatedGuest.id), updatedGuest).catch(console.warn);
+      setDoc(doc(db, COLLECTIONS.GUESTS, updatedGuest.id), sanitizeForFirestore(updatedGuest)).catch(console.warn);
     }
 
     return updatedGuest;
@@ -362,7 +396,7 @@ export class WeddingService {
     const updated = this.updateGuestStatus(guestId, status, confirmedCompanions, dietRestrictions, message);
     if (updated && db) {
       try {
-        await setDoc(doc(db, COLLECTIONS.GUESTS, updated.id), updated);
+        await setDoc(doc(db, COLLECTIONS.GUESTS, updated.id), sanitizeForFirestore(updated));
       } catch (e) {
         console.warn('Erro ao atualizar guest no Firestore:', e);
       }
@@ -381,7 +415,7 @@ export class WeddingService {
     setLocalItem(STORAGE_KEYS.GUESTS, guests);
 
     if (db) {
-      setDoc(doc(db, COLLECTIONS.GUESTS, guests[index].id), guests[index]).catch(console.warn);
+      setDoc(doc(db, COLLECTIONS.GUESTS, guests[index].id), sanitizeForFirestore(guests[index])).catch(console.warn);
     }
 
     return guests[index];
@@ -396,7 +430,7 @@ export class WeddingService {
       setLocalItem(STORAGE_KEYS.GUESTS, guests);
 
       if (db) {
-        setDoc(doc(db, COLLECTIONS.GUESTS, guests[index].id), guests[index]).catch(console.warn);
+        setDoc(doc(db, COLLECTIONS.GUESTS, guests[index].id), sanitizeForFirestore(guests[index])).catch(console.warn);
       }
     }
   }
@@ -407,6 +441,17 @@ export class WeddingService {
 
     if (db) {
       deleteDoc(doc(db, COLLECTIONS.GUESTS, guestId)).catch(console.warn);
+    }
+  }
+
+  static async deleteGuestAsync(guestId: string): Promise<void> {
+    this.deleteGuest(guestId);
+    if (db) {
+      try {
+        await deleteDoc(doc(db, COLLECTIONS.GUESTS, guestId));
+      } catch (e) {
+        console.warn('Erro ao deletar guest no Firestore:', e);
+      }
     }
   }
 
@@ -451,7 +496,7 @@ export class WeddingService {
     setLocalItem(STORAGE_KEYS.GIFTS, gifts);
 
     if (db) {
-      setDoc(doc(db, COLLECTIONS.GIFTS, finalGift.id), finalGift).catch(console.warn);
+      setDoc(doc(db, COLLECTIONS.GIFTS, finalGift.id), sanitizeForFirestore(finalGift)).catch(console.warn);
     }
 
     return finalGift;
@@ -461,11 +506,40 @@ export class WeddingService {
     giftId: string, 
     guestName: string, 
     guestPhone?: string, 
-    message?: string
+    message?: string,
+    amount?: number
   ): { success: boolean; error?: string } {
+    // Presente Livre / Valor Personalizado: não bloqueia nem oculta nada do catálogo, é infinito
+    if (giftId === 'custom-amount' || giftId.startsWith('custom-')) {
+      this.recordPixContribution({
+        giftId: 'custom-amount',
+        giftTitle: 'Presente Livre / Valor Personalizado',
+        guestName: guestName.trim(),
+        guestPhone: guestPhone?.trim() || '',
+        amount: amount || 0,
+        message: message?.trim() || 'Vou entregar um presente livre / envelope pessoalmente no dia do casamento!',
+        status: 'confirmed',
+        paymentMethod: 'in_person',
+      });
+      return { success: true };
+    }
+
     const gifts = this.getGifts();
     const giftIndex = gifts.findIndex(g => g.id === giftId);
-    if (giftIndex === -1) return { success: false, error: 'Presente não encontrado.' };
+    if (giftIndex === -1) {
+      // Caso seja um item dinâmico ou valor livre
+      this.recordPixContribution({
+        giftId: giftId,
+        giftTitle: 'Presente Personalizado',
+        guestName: guestName.trim(),
+        guestPhone: guestPhone?.trim() || '',
+        amount: amount || 0,
+        message: message?.trim() || 'Vou entregar pessoalmente no dia do casamento!',
+        status: 'confirmed',
+        paymentMethod: 'in_person',
+      });
+      return { success: true };
+    }
 
     if (gifts[giftIndex].reservedInPerson) {
       return { 
@@ -474,7 +548,7 @@ export class WeddingService {
       };
     }
 
-    // Marca o presente como reservado para entrega física
+    // Marca o presente específico como reservado para entrega física
     gifts[giftIndex].reservedInPerson = true;
     gifts[giftIndex].reservedByGuestName = guestName.trim();
     gifts[giftIndex].reservedAt = new Date().toISOString();
@@ -488,7 +562,7 @@ export class WeddingService {
       giftTitle: gifts[giftIndex].title,
       guestName: guestName.trim(),
       guestPhone: guestPhone?.trim() || '',
-      amount: gifts[giftIndex].price,
+      amount: gifts[giftIndex].price || amount || 0,
       message: message?.trim() || 'Vou entregar este presente pessoalmente no dia do casamento!',
       status: 'confirmed',
       paymentMethod: 'in_person',
@@ -497,15 +571,38 @@ export class WeddingService {
     return { success: true };
   }
 
-  static clearGiftReservation(giftId: string): void {
+  static clearGiftReservation(giftId: string): Gift | null {
     const gifts = this.getGifts();
     const giftIndex = gifts.findIndex(g => g.id === giftId);
-    if (giftIndex >= 0) {
-      gifts[giftIndex].reservedInPerson = false;
-      gifts[giftIndex].reservedByGuestName = undefined;
-      gifts[giftIndex].reservedAt = undefined;
-      this.saveGift(gifts[giftIndex]);
+    if (giftIndex === -1) return null;
+
+    const updatedGift: Gift = {
+      ...gifts[giftIndex],
+      reservedInPerson: false,
+    };
+    delete (updatedGift as any).reservedByGuestName;
+    delete (updatedGift as any).reservedAt;
+
+    gifts[giftIndex] = updatedGift;
+    setLocalItem(STORAGE_KEYS.GIFTS, gifts);
+
+    if (db) {
+      setDoc(doc(db, COLLECTIONS.GIFTS, updatedGift.id), sanitizeForFirestore(updatedGift)).catch(console.warn);
     }
+
+    return updatedGift;
+  }
+
+  static async clearGiftReservationAsync(giftId: string): Promise<Gift | null> {
+    const updated = this.clearGiftReservation(giftId);
+    if (updated && db) {
+      try {
+        await setDoc(doc(db, COLLECTIONS.GIFTS, updated.id), sanitizeForFirestore(updated));
+      } catch (e) {
+        console.warn('Erro ao liberar presente no Firestore:', e);
+      }
+    }
+    return updated;
   }
 
   static deleteGift(giftId: string): void {
@@ -528,7 +625,7 @@ export class WeddingService {
     setLocalItem(STORAGE_KEYS.PIX_LOGS, contributions);
 
     if (db) {
-      setDoc(doc(db, COLLECTIONS.PIX_CONTRIBUTIONS, newContrib.id), newContrib).catch(console.warn);
+      setDoc(doc(db, COLLECTIONS.PIX_CONTRIBUTIONS, newContrib.id), sanitizeForFirestore(newContrib)).catch(console.warn);
     }
 
     if (contribution.paymentMethod !== 'in_person') {
@@ -568,6 +665,26 @@ export class WeddingService {
         createdAt: '2026-08-12T19:00:00Z',
       }
     ]);
+  }
+
+  static deletePixContribution(id: string): void {
+    const list = this.getPixContributions().filter(item => item.id !== id);
+    setLocalItem(STORAGE_KEYS.PIX_LOGS, list);
+
+    if (db) {
+      deleteDoc(doc(db, COLLECTIONS.PIX_CONTRIBUTIONS, id)).catch(console.warn);
+    }
+  }
+
+  static async deletePixContributionAsync(id: string): Promise<void> {
+    this.deletePixContribution(id);
+    if (db) {
+      try {
+        await deleteDoc(doc(db, COLLECTIONS.PIX_CONTRIBUTIONS, id));
+      } catch (e) {
+        console.warn('Erro ao deletar contribuição no Firestore:', e);
+      }
+    }
   }
 
   // --- PHOTOS ---
@@ -620,7 +737,7 @@ export class WeddingService {
     setLocalItem(STORAGE_KEYS.PHOTOS, photos);
 
     if (db) {
-      setDoc(doc(db, COLLECTIONS.PHOTOS, newPhoto.id), newPhoto).catch(console.warn);
+      setDoc(doc(db, COLLECTIONS.PHOTOS, newPhoto.id), sanitizeForFirestore(newPhoto)).catch(console.warn);
     }
 
     return newPhoto;
@@ -634,7 +751,7 @@ export class WeddingService {
       setLocalItem(STORAGE_KEYS.PHOTOS, photos);
 
       if (db) {
-        setDoc(doc(db, COLLECTIONS.PHOTOS, photos[index].id), photos[index]).catch(console.warn);
+        setDoc(doc(db, COLLECTIONS.PHOTOS, photos[index].id), sanitizeForFirestore(photos[index])).catch(console.warn);
       }
     }
   }

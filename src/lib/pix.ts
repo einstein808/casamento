@@ -4,13 +4,13 @@ export interface PixPayloadParams {
   pixKey: string;
   merchantName: string;
   merchantCity: string;
-  amount: number;
+  amount?: number;
   txId?: string;
   description?: string;
 }
 
 /**
- * Formats a string to EMV standard: ID (2 chars) + Length (2 chars) + Value
+ * Formata um campo no padrão EMVCo: ID (2 chars) + Tamanho (2 chars) + Valor
  */
 function formatEMV(id: string, value: string): string {
   const len = value.length.toString().padStart(2, '0');
@@ -18,18 +18,54 @@ function formatEMV(id: string, value: string): string {
 }
 
 /**
- * Normalizes text to ASCII uppercase without accents (for PIX standard compatibility)
+ * Normaliza o texto para caracteres ASCII maiúsculos sem acentos
  */
 function normalizeText(text: string, maxLen: number = 25): string {
-  return text
+  return (text || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9 ]/g, '')
     .toUpperCase()
+    .trim()
     .slice(0, maxLen);
 }
 
 /**
- * Calculates CRC16-CCITT for the PIX payload
+ * Sanitiza a chave PIX de acordo com o tipo
+ */
+export function sanitizePixKey(key: string): string {
+  if (!key) return '';
+  const trimmed = key.trim();
+
+  // E-mail
+  if (trimmed.includes('@')) {
+    return trimmed.toLowerCase();
+  }
+
+  // Chave Aleatória (UUID)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+
+  // Telefone internacional com +
+  if (trimmed.startsWith('+')) {
+    const digits = trimmed.replace(/\D/g, '');
+    return `+${digits}`;
+  }
+
+  const digitsOnly = trimmed.replace(/\D/g, '');
+
+  // CPF (11 dígitos) ou CNPJ (14 dígitos)
+  if (digitsOnly.length === 11 || digitsOnly.length === 14) {
+    return digitsOnly;
+  }
+
+  return trimmed;
+}
+
+/**
+ * Calcula o CRC16-CCITT (Polinômio 0x1021, Init 0xFFFF)
  */
 function calculateCRC16(payload: string): string {
   let crc = 0xffff;
@@ -50,7 +86,7 @@ function calculateCRC16(payload: string): string {
 }
 
 /**
- * Generates the Brazilian Central Bank standard PIX Copia e Cola payload
+ * Gera a string no padrão oficial BR Code / BACEN PIX Copia e Cola
  */
 export function generatePixPayload({
   pixKey,
@@ -58,52 +94,54 @@ export function generatePixPayload({
   merchantCity,
   amount,
   txId = '***',
-  description = '',
 }: PixPayloadParams): string {
-  // Payload Format Indicator
+  const cleanKey = sanitizePixKey(pixKey);
+
+  // 00: Payload Format Indicator (01)
   const pfi = formatEMV('00', '01');
 
-  // Point of Initiation Method (12 = Dynamic/recurring or with amount)
-  const poi = formatEMV('01', '12');
+  // 01: Point of Initiation Method (11 = QR Code Estático)
+  const poi = formatEMV('01', '11');
 
-  // Merchant Account Information - GUI + Key + Description
+  // 26: Merchant Account Information
   const gui = formatEMV('00', 'br.gov.bcb.pix');
-  const key = formatEMV('01', pixKey.trim());
-  const desc = description ? formatEMV('02', normalizeText(description, 50)) : '';
-  const merchantAccountInfo = formatEMV('26', `${gui}${key}${desc}`);
+  const key = formatEMV('01', cleanKey);
+  const merchantAccountInfo = formatEMV('26', `${gui}${key}`);
 
-  // Merchant Category Code (0000 = default)
+  // 52: Merchant Category Code (0000 = Padrão ISO 18245)
   const mcc = formatEMV('52', '0000');
 
-  // Transaction Currency (986 = BRL)
+  // 53: Transaction Currency (986 = Real BRL)
   const currency = formatEMV('53', '986');
 
-  // Transaction Amount (formatted e.g. 150.00)
-  const formattedAmount = amount > 0 ? formatEMV('54', amount.toFixed(2)) : '';
+  // 54: Transaction Amount (Se > 0 inclui valor, se 0 ou nulo omite para valor livre no app do banco)
+  const formattedAmount = amount && amount > 0 ? formatEMV('54', Number(amount).toFixed(2)) : '';
 
-  // Country Code (BR)
+  // 58: Country Code (BR)
   const country = formatEMV('58', 'BR');
 
-  // Merchant Name (max 25 chars)
-  const name = formatEMV('59', normalizeText(merchantName || 'NOIVOS', 25));
+  // 59: Merchant Name (Máx 25 caracteres)
+  const cleanName = normalizeText(merchantName || 'CASAMENTO', 25) || 'CASAMENTO';
+  const name = formatEMV('59', cleanName);
 
-  // Merchant City (max 15 chars)
-  const city = formatEMV('60', normalizeText(merchantCity || 'BRASIL', 15));
+  // 60: Merchant City (Máx 15 caracteres)
+  const cleanCity = normalizeText(merchantCity || 'SAO PAULO', 15) || 'SAO PAULO';
+  const city = formatEMV('60', cleanCity);
 
-  // Additional Data Field Template (TxID)
-  const safeTxId = normalizeText(txId || '***', 25);
-  const additionalDataField = formatEMV('62', formatEMV('05', safeTxId));
+  // 62: Additional Data Field Template (TxID / Identificador)
+  const cleanTxId = (txId || '***').replace(/[^A-Za-z0-9*]/g, '').slice(0, 25) || '***';
+  const additionalDataField = formatEMV('62', formatEMV('05', cleanTxId));
 
-  // Base payload without CRC16
+  // Concatenação com o indicador de início do CRC (6304)
   const rawPayload = `${pfi}${poi}${merchantAccountInfo}${mcc}${currency}${formattedAmount}${country}${name}${city}${additionalDataField}6304`;
 
-  // Append calculated CRC16
+  // Cálculo e inserção do CRC16 final
   const crc = calculateCRC16(rawPayload);
   return `${rawPayload}${crc}`;
 }
 
 /**
- * Generates a QR Code Base64 Data URL from the PIX payload
+ * Gera a imagem do QR Code em Base64 Data URL a partir do payload PIX
  */
 export async function generatePixQrCode(payload: string): Promise<string> {
   try {

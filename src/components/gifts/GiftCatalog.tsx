@@ -91,7 +91,7 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
       title: 'Presente Livre / Valor Personalizado',
       description: 'Escolha qualquer quantia que desejar para abençoar a nova jornada dos noivos!',
       category: 'experiencias',
-      price: 150.00,
+      price: 0,
       imageUrl: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
       active: true,
     };

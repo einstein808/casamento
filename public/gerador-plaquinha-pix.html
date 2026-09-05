@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerador de Plaquinha PIX Oficial</title>
+  <meta name="description" content="Gerador de plaquinha PIX e QR Code padrão Banco Central (EMV/BR Code) 100% no navegador.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Bibliotecas CDN (cdnjs) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    :root {
+      --pix-teal: #32BCAD;
+      --pix-teal-dark: #1E8C81;
+      --pix-teal-deep: #0D4E47;
+      --pix-teal-light: #EBF7F6;
+      --pix-accent: #E58D23;
+      --bg-body: #F3F7F8;
+      --bg-card: #FFFFFF;
+      --text-main: #1C2D2F;
+      --text-muted: #5C7174;
+      --border-color: #DDE7E8;
+      --border-focus: #32BCAD;
+      --radius-lg: 20px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --shadow-sm: 0 2px 8px rgba(13, 78, 71, 0.06);
+      --shadow-md: 0 8px 24px rgba(13, 78, 71, 0.08);
+      --shadow-lg: 0 16px 40px rgba(13, 78, 71, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, var(--pix-teal-deep) 0%, #115F56 100%);
+      color: #FFFFFF;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 4px 20px rgba(13, 78, 71, 0.15);
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .pix-badge-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .pix-icon-svg {
+      width: 28px;
+      height: 28px;
+      fill: var(--pix-teal);
+    }
+
+    .header-subtitle {
+      font-size: 0.95rem;
+      color: #D3ECE9;
+      max-width: 600px;
+    }
+
+    /* Main Container */
+    main {
+      max-width: 1200px;
+      width: 100%;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      display: grid;
+      grid-template-columns: 1.15fr 1fr;
+      gap: 2.5rem;
+      align-items: start;
+      flex: 1;
+    }
+
+    /* Cards */
+    .panel-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border-color);
+    }
+
+    .panel-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--pix-teal-deep);
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid var(--pix-teal-light);
+      padding-bottom: 0.75rem;
+    }
+
+    /* Formulário */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    label .req {
+      color: #E74C3C;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      font-family: inherit;
+      font-size: 0.95rem;
+      color: var(--text-main);
+      background-color: #FAFCFC;
+      border: 1.5px solid var(--border-color);
+      border-radius: var(--radius-md);
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--border-focus);
+      background-color: #FFFFFF;
+      box-shadow: 0 0 0 3px rgba(50, 188, 173, 0.15);
+    }
+
+    .input-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.3rem;
+    }
+
+    /* Logo Upload */
+    .logo-upload-box {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--pix-teal-light);
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      border: 1px dashed var(--pix-teal);
+    }
+
+    .logo-preview-thumb {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-sm);
+      object-fit: cover;
+      background: white;
+      border: 1px solid var(--border-color);
+      display: none;
+    }
+
+    .logo-upload-box input[type="file"] {
+      display: none;
+    }
+
+    .btn-upload {
+      background: white;
+      border: 1px solid var(--pix-teal);
+      color: var(--pix-teal-dark);
+      padding: 0.5rem 0.9rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s;
+    }
+
+    .btn-upload:hover {
+      background: var(--pix-teal);
+      color: white;
+    }
+
+    .btn-remove-logo {
+      background: transparent;
+      border: none;
+      color: #E74C3C;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: underline;
+      display: none;
+    }
+
+    /* Checkbox */
+    .checkbox-container {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.65rem;
+      margin-top: 1.5rem;
+      background: #F8FAFA;
+      padding: 0.9rem 1.1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+    }
+
+    .checkbox-container input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      accent-color: var(--pix-teal);
+      cursor: pointer;
+    }
+
+    .checkbox-text {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-main);
+      user-select: none;
+    }
+
+    /* Coluna Direita (Prévia da Plaquinha) */
+    .preview-sticky {
+      position: sticky;
+      top: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      align-items: center;
+    }
+
+    /* Plaquinha Visual */
+    .plaquinha-wrapper {
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .plaquinha {
+      background: #FFFFFF;
+      border-radius: 24px;
+      border: 2px solid #E2ECEB;
+      box-shadow: 0 14px 35px rgba(13, 78, 71, 0.12);
+      padding: 2rem 1.75rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: all 0.3s ease;
+    }
+
+    .plaquinha::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 8px;
+      background: linear-gradient(90deg, var(--pix-teal) 0%, #15B8A6 100%);
+    }
+
+    /* Logo no topo da plaquinha */
+    .plaq-logo-container {
+      margin-bottom: 0.8rem;
+      max-height: 55px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .plaq-logo-container img {
+      max-height: 50px;
+      max-width: 140px;
+      object-fit: contain;
+    }
+
+    /* Header da Plaquinha */
+    .plaq-header {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--pix-teal-light);
+      color: var(--pix-teal-deep);
+      padding: 0.4rem 1rem;
+      border-radius: 50px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+    }
+
+    .plaq-header svg {
+      width: 18px;
+      height: 18px;
+      fill: var(--pix-teal);
+    }
+
+    /* QR Code Container */
+    .plaq-qr-box {
+      background: #FFFFFF;
+      padding: 12px;
+      border-radius: 18px;
+      border: 2px solid var(--pix-teal-light);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+      margin-bottom: 1.25rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 200px;
+      min-width: 200px;
+    }
+
+    .plaq-qr-box canvas,
+    .plaq-qr-box img {
+      display: block;
+      border-radius: 8px;
+    }
+
+    /* Dados do recebedor */
+    .plaq-receiver-name {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      margin-bottom: 0.2rem;
+      word-break: break-word;
+    }
+
+    .plaq-receiver-city {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.6rem;
+    }
+
+    /* Valor em destaque */
+    .plaq-amount-tag {
+      display: none;
+      background: #F0FAF8;
+      border: 1px solid #C4E9E5;
+      color: var(--pix-teal-deep);
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      padding: 0.3rem 1rem;
+      border-radius: 12px;
+      margin-bottom: 0.75rem;
+    }
+
+    .plaq-instruction {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      margin-top: 0.4rem;
+    }
+
+    /* Chave Legível para Digitação */
+    .plaq-manual-key-box {
+      margin-top: 1rem;
+      padding-top: 0.9rem;
+      border-top: 1px dashed var(--border-color);
+      width: 100%;
+      display: none;
+    }
+
+    .plaq-manual-key-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+
+    .plaq-manual-key-value {
+      font-family: 'Outfit', monospace;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--pix-teal-deep);
+      background: var(--pix-teal-light);
+      padding: 0.4rem 0.8rem;
+      border-radius: 8px;
+      word-break: break-all;
+      user-select: all;
+    }
+
+    /* Botões de Ações */
+    .actions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .btn-action {
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.8rem 0.9rem;
+      border-radius: var(--radius-md);
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      transition: all 0.2s ease;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-primary {
+      background: var(--pix-teal);
+      color: #FFFFFF;
+      grid-column: span 2;
+      font-size: 0.95rem;
+    }
+
+    .btn-primary:hover {
+      background: var(--pix-teal-dark);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: #FFFFFF;
+      color: var(--pix-teal-deep);
+      border: 1.5px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background: var(--pix-teal-light);
+      border-color: var(--pix-teal);
+      transform: translateY(-1px);
+    }
+
+    .btn-action svg {
+      width: 16px;
+      height: 16px;
+      stroke-width: 2.2;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: var(--pix-teal-deep);
+      color: #FFFFFF;
+      padding: 0.75rem 1.5rem;
+      border-radius: 50px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      z-index: 9999;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* Estilo de Impressão (@media print) */
+    @media print {
+      body {
+        background: #FFFFFF !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #000000 !important;
+      }
+
+      header,
+      .panel-card,
+      .actions-grid,
+      .toast,
+      .input-hint,
+      footer {
+        display: none !important;
+      }
+
+      main {
+        display: block !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+
+      .preview-sticky {
+        position: static !important;
+      }
+
+      .plaquinha-wrapper {
+        max-width: 480px !important;
+        margin: 30px auto !important;
+      }
+
+      .plaquinha {
+        box-shadow: none !important;
+        border: 2px solid #000000 !important;
+        border-radius: 20px !important;
+        padding: 2.5rem 2rem !important;
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+      }
+
+      .plaq-qr-box {
+        border-color: #E2ECEB !important;
+        min-height: 250px !important;
+        min-width: 250px !important;
+      }
+
+      .plaq-qr-box canvas,
+      .plaq-qr-box img {
+        width: 240px !important;
+        height: 240px !important;
+      }
+    }
+
+    /* Responsividade */
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+
+      .preview-sticky {
+        position: static;
+      }
+
+      .plaquinha-wrapper,
+      .actions-grid {
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+
+      .panel-card {
+        padding: 1.25rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-content">
+      <div class="pix-badge-title">
+        <svg class="pix-icon-svg" viewBox="0 0 512 512">
+          <path d="M112.5 131.7L196.3 47.9c13.7-13.7 36.1-13.7 49.8 0l218 218c13.7 13.7 13.7 36.1 0 49.8l-83.8 83.8c-13.7 13.7-36.1 13.7-49.8 0l-218-218c-13.8-13.8-13.8-36.1 0-49.8zm287 248.6l-83.8 83.8c-13.7 13.7-36.1 13.7-49.8 0l-218-218c-13.7-13.7-13.7-36.1 0-49.8l83.8-83.8c13.7-13.7 36.1-13.7 49.8 0l218 218c13.8 13.7 13.8 36.1 0 49.8z"/>
+        </svg>
+        <span>Gerador de Plaquinha PIX</span>
+      </div>
+      <p class="header-subtitle">
+        Gere QR Codes estáticos compatíveis com o padrão oficial do Banco Central (EMV/BR Code) prontos para imprimir e receber pagamentos.
+      </p>
+    </div>
+  </header>
+
+  <main>
+    <!-- COLUNA ESQUERDA: FORMULÁRIO -->
+    <section class="panel-card">
+      <h2 class="panel-title">
+        <span>1. Dados do Pagamento</span>
+        <span style="font-size: 0.75rem; font-weight: 500; color: var(--pix-teal-dark);">100% no Navegador</span>
+      </h2>
+
+      <form id="pixForm" onsubmit="return false;">
+        <!-- Tipo de Chave & Chave Pix -->
+        <div class="form-row">
+          <div class="form-group">
+            <label for="keyType">Tipo de Chave <span class="req">*</span></label>
+            <select id="keyType">
+              <option value="email">E-mail</option>
+              <option value="celular">Celular (com DDD)</option>
+              <option value="cpf">CPF (apenas números)</option>
+              <option value="cnpj">CNPJ (apenas números)</option>
+              <option value="aleatoria">Chave Aleatória (EVP)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="pixKey">Chave Pix <span class="req">*</span></label>
+            <input type="text" id="pixKey" placeholder="exemplo@seuemail.com" value="teste@email.com" required autocomplete="off">
+            <p class="input-hint" id="keyHint">Digite o e-mail cadastrado no seu banco</p>
+          </div>
+        </div>
+
+        <!-- Nome do Recebedor & Cidade -->
+        <div class="form-row">
+          <div class="form-group">
+            <label for="merchantName">Nome do Recebedor <span class="req">*</span></label>
+            <input type="text" id="merchantName" maxlength="25" placeholder="Ex: JOAO DA SILVA" value="JOAO DA SILVA" required autocomplete="off">
+            <p class="input-hint">Máx. 25 caracteres (sem acentos)</p>
+          </div>
+
+          <div class="form-group">
+            <label for="merchantCity">Cidade do Recebedor <span class="req">*</span></label>
+            <input type="text" id="merchantCity" maxlength="15" placeholder="Ex: BLUMENAU" value="BLUMENAU" required autocomplete="off">
+            <p class="input-hint">Máx. 15 caracteres (sem acentos)</p>
+          </div>
+        </div>
+
+        <!-- Valor & Identificador TXID -->
+        <div class="form-row">
+          <div class="form-group">
+            <label for="pixAmount">Valor (R$) <span style="font-size:0.75rem; color:var(--pix-teal-dark); font-weight:600;">(Opcional - Deixe vazio p/ Valor Livre)</span></label>
+            <input type="text" id="pixAmount" placeholder="Deixe em branco p/ valor livre no app do banco" value="" autocomplete="off">
+            <p class="input-hint">✨ Sem valor fixo: o cliente digita a quantia que quiser no banco</p>
+          </div>
+
+          <div class="form-group">
+            <label for="pixTxid">Identificador (TxID) <span style="font-size:0.75rem; color:var(--text-muted);">(Opcional)</span></label>
+            <input type="text" id="pixTxid" maxlength="25" placeholder="Ex: MESA01 ou PEDIDO123" autocomplete="off">
+            <p class="input-hint">Letras e números (máx. 25)</p>
+          </div>
+        </div>
+
+        <!-- Logo Opcional -->
+        <div class="form-group">
+          <label>Logo do Estabelecimento <span style="font-size:0.75rem; color:var(--text-muted);">(Opcional)</span></label>
+          <div class="logo-upload-box">
+            <img id="logoThumb" class="logo-preview-thumb" alt="Preview da Logo">
+            <div>
+              <label for="logoInput" class="btn-upload">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span>Escolher Imagem...</span>
+              </label>
+              <input type="file" id="logoInput" accept="image/*">
+              <button type="button" id="btnRemoveLogo" class="btn-remove-logo" onclick="removeLogo()">Remover Logo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Checkbox Chave para Digitação -->
+        <label class="checkbox-container">
+          <input type="checkbox" id="showManualKeyCheckbox">
+          <span class="checkbox-text">
+            <strong>Mostrar a chave Pix abaixo do QR</strong><br>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">
+              Exibe o número formatado ou e-mail na plaquinha para quem preferir digitar no aplicativo.
+            </span>
+          </span>
+        </label>
+      </form>
+    </section>
+
+    <!-- COLUNA DIREITA: PRÉVIA AO VIVO DA PLAQUINHA -->
+    <section class="preview-sticky">
+      <div class="plaquinha-wrapper">
+        <div id="plaquinha" class="plaquinha">
+          <!-- Logo Opcional no topo -->
+          <div id="plaqLogoWrap" class="plaq-logo-container">
+            <img id="plaqLogoImg" alt="Logo">
+          </div>
+
+          <!-- Badge Pague com Pix -->
+          <div class="plaq-header">
+            <svg viewBox="0 0 512 512">
+              <path d="M112.5 131.7L196.3 47.9c13.7-13.7 36.1-13.7 49.8 0l218 218c13.7 13.7 13.7 36.1 0 49.8l-83.8 83.8c-13.7 13.7-36.1 13.7-49.8 0l-218-218c-13.8-13.8-13.8-36.1 0-49.8zm287 248.6l-83.8 83.8c-13.7 13.7-36.1 13.7-49.8 0l-218-218c-13.7-13.7-13.7-36.1 0-49.8l83.8-83.8c13.7-13.7 36.1-13.7 49.8 0l218 218c13.8 13.7 13.8 36.1 0 49.8z"/>
+            </svg>
+            <span>Pague com Pix</span>
+          </div>
+
+          <!-- QR Code Canvas Container -->
+          <div class="plaq-qr-box">
+            <div id="qrcode"></div>
+          </div>
+
+          <!-- Nome e Cidade do Recebedor -->
+          <h3 id="plaqName" class="plaq-receiver-name">JOAO DA SILVA</h3>
+          <p id="plaqCity" class="plaq-receiver-city">BLUMENAU</p>
+
+          <!-- Valor Opcional -->
+          <div id="plaqAmount" class="plaq-amount-tag">R$ 10,00</div>
+
+          <!-- Dica -->
+          <p class="plaq-instruction">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Aponte a câmera do seu banco</span>
+          </p>
+
+          <!-- Chave Formatada para Digitação -->
+          <div id="plaqManualKeyWrap" class="plaq-manual-key-box">
+            <p class="plaq-manual-key-label">Se preferir, nossa chave Pix:</p>
+            <p id="plaqManualKeyValue" class="plaq-manual-key-value">teste@email.com</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTÕES DE AÇÕES -->
+      <div class="actions-grid">
+        <button type="button" class="btn-action btn-primary" onclick="copyPixCode()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span>Copiar Código Pix</span>
+        </button>
+
+        <button type="button" class="btn-action btn-secondary" onclick="downloadQrOnly()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span>Baixar QR</span>
+        </button>
+
+        <button type="button" class="btn-action btn-secondary" onclick="downloadPlaquinhaPng()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Baixar Plaquinha (PNG)</span>
+        </button>
+
+        <button type="button" class="btn-action btn-secondary" style="grid-column: span 2;" onclick="printPlaquinha()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <span>Imprimir Plaquinha</span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Toast de Notificação -->
+  <div id="toast" class="toast">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+    <span id="toastMsg">Copiado com sucesso!</span>
+  </div>
+
+  <script>
+    /* =========================================================
+       1. PADRÃO EMV / BR CODE (BANCO CENTRAL DO BRASIL) & CRC16
+       ========================================================= */
+
+    /**
+     * Formata um campo no formato TLV: Tag (2 dígitos) + Tamanho (2 dígitos) + Valor
+     */
+    function formatTLV(tag, value) {
+      const valStr = String(value);
+      const lenStr = String(valStr.length).padStart(2, '0');
+      return `${tag}${lenStr}${valStr}`;
+    }
+
+    /**
+     * Remove acentos e caracteres especiais, mantendo texto ASCII puro
+     */
+    function normalizeAscii(str) {
+      if (!str) return '';
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Za-z0-9\s]/g, '')
+        .trim();
+    }
+
+    /**
+     * Algoritmo CRC-16 / CCITT-FALSE (Poly: 0x1021, Init: 0xFFFF, Sem reflexão, Sem XOR final)
+     */
+    function crc16(str) {
+      let crc = 0xFFFF;
+      for (let i = 0; i < str.length; i++) {
+        crc ^= (str.charCodeAt(i) << 8);
+        for (let j = 0; j < 8; j++) {
+          if ((crc & 0x8000) !== 0) {
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+          } else {
+            crc = (crc << 1) & 0xFFFF;
+          }
+        }
+      }
+      return crc.toString(16).toUpperCase().padStart(4, '0');
+    }
+
+    /**
+     * Higieniza a chave Pix com base no tipo selecionado
+     */
+    function sanitizePixKey(key, type) {
+      if (!key) return '';
+      const raw = key.trim();
+
+      if (type === 'celular') {
+        const digits = raw.replace(/\D/g, '');
+        if (!digits) return '';
+        if (digits.startsWith('55') && digits.length >= 12) {
+          return `+${digits}`;
+        }
+        return `+55${digits}`;
+      }
+
+      if (type === 'cpf' || type === 'cnpj') {
+        return raw.replace(/\D/g, '');
+      }
+
+      return raw; // e-mail ou aleatória
+    }
+
+    /**
+     * Formata a chave para exibição legível ao usuário
+     */
+    function formatKeyForDisplay(key, type) {
+      if (!key) return '';
+      const raw = key.trim();
+
+      if (type === 'celular') {
+        let digits = raw.replace(/\D/g, '');
+        if (digits.startsWith('55') && digits.length >= 12) {
+          digits = digits.substring(2);
+        }
+        if (digits.length === 11) {
+          return `(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7)}`;
+        }
+        if (digits.length === 10) {
+          return `(${digits.substring(0, 2)}) ${digits.substring(2, 6)}-${digits.substring(6)}`;
+        }
+        return raw;
+      }
+
+      if (type === 'cpf') {
+        const digits = raw.replace(/\D/g, '');
+        if (digits.length === 11) {
+          return `${digits.substring(0,3)}.${digits.substring(3,6)}.${digits.substring(6,9)}-${digits.substring(9)}`;
+        }
+        return raw;
+      }
+
+      if (type === 'cnpj') {
+        const digits = raw.replace(/\D/g, '');
+        if (digits.length === 14) {
+          return `${digits.substring(0,2)}.${digits.substring(2,5)}.${digits.substring(5,8)}/${digits.substring(8,12)}-${digits.substring(12)}`;
+        }
+        return raw;
+      }
+
+      return raw;
+    }
+
+    /**
+     * Monta o Pix Copia e Cola completo no padrão oficial do Banco Central
+     */
+    function generatePixPayload(options) {
+      const { key, type, name, city, amount, txid } = options;
+
+      const cleanKey = sanitizePixKey(key, type);
+      const cleanName = normalizeAscii(name).toUpperCase().substring(0, 25) || 'RECEBEDOR';
+      const cleanCity = normalizeAscii(city).toUpperCase().substring(0, 15) || 'BRASIL';
+
+      // 00 = Payload Format Indicator
+      let payload = formatTLV('00', '01');
+
+      // 01 = Point of Initiation Method (11 = estático)
+      payload += formatTLV('01', '11');
+
+      // 26 = Merchant Account Information
+      const gui = formatTLV('00', 'br.gov.bcb.pix');
+      const keyField = formatTLV('01', cleanKey);
+      payload += formatTLV('26', gui + keyField);
+
+      // 52 = Merchant Category Code
+      payload += formatTLV('52', '0000');
+
+      // 53 = Transaction Currency (986 = BRL)
+      payload += formatTLV('53', '986');
+
+      // 54 = Transaction Amount (apenas se houver valor válido)
+      if (amount) {
+        const num = parseFloat(String(amount).replace(',', '.'));
+        if (!isNaN(num) && num > 0) {
+          payload += formatTLV('54', num.toFixed(2));
+        }
+      }
+
+      // 58 = Country Code (BR)
+      payload += formatTLV('58', 'BR');
+
+      // 59 = Merchant Name (Max 25)
+      payload += formatTLV('59', cleanName);
+
+      // 60 = Merchant City (Max 15)
+      payload += formatTLV('60', cleanCity);
+
+      // 62 = Additional Data Field Template (TxID)
+      let cleanTxid = (txid ? normalizeAscii(txid) : '').substring(0, 25);
+      if (!cleanTxid) cleanTxid = '***';
+      const txidField = formatTLV('05', cleanTxid);
+      payload += formatTLV('62', txidField);
+
+      // 63 = CRC16 (Tag + Tamanho 04 fixos)
+      payload += '6304';
+      const crc = crc16(payload);
+
+      return payload + crc;
+    }
+
+    /* =========================================================
+       2. GESTÃO DO QR CODE & ATUALIZAÇÃO AO VIVO
+       ========================================================= */
+
+    let qrcodeInstance = null;
+    let currentPixPayload = '';
+    let currentLogoDataUrl = null;
+
+    function initQRCode() {
+      const container = document.getElementById('qrcode');
+      container.innerHTML = '';
+      qrcodeInstance = new QRCode(container, {
+        text: 'PIX',
+        width: 190,
+        height: 190,
+        colorDark: '#0D4E47',
+        colorLight: '#FFFFFF',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    function updateLivePreview() {
+      const keyType = document.getElementById('keyType').value;
+      const pixKey = document.getElementById('pixKey').value.trim();
+      const name = document.getElementById('merchantName').value.trim();
+      const city = document.getElementById('merchantCity').value.trim();
+      const amount = document.getElementById('pixAmount').value.trim();
+      const txid = document.getElementById('pixTxid').value.trim();
+      const showManualKey = document.getElementById('showManualKeyCheckbox').checked;
+
+      // Atualiza texto da plaquinha
+      document.getElementById('plaqName').textContent = name.toUpperCase() || 'NOME DO RECEBEDOR';
+      document.getElementById('plaqCity').textContent = city.toUpperCase() || 'CIDADE';
+
+      // Atualiza valor
+      const amountTag = document.getElementById('plaqAmount');
+      const numAmount = parseFloat(amount.replace(',', '.'));
+      if (!isNaN(numAmount) && numAmount > 0) {
+        amountTag.textContent = numAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        amountTag.style.display = 'inline-block';
+      } else {
+        amountTag.style.display = 'none';
+      }
+
+      // Atualiza Chave Manual
+      const manualKeyBox = document.getElementById('plaqManualKeyWrap');
+      const manualKeyValue = document.getElementById('plaqManualKeyValue');
+      if (showManualKey && pixKey) {
+        manualKeyValue.textContent = formatKeyForDisplay(pixKey, keyType);
+        manualKeyBox.style.display = 'block';
+      } else {
+        manualKeyBox.style.display = 'none';
+      }
+
+      // Gera Payload e Renderiza QR Code
+      if (pixKey) {
+        currentPixPayload = generatePixPayload({
+          key: pixKey,
+          type: keyType,
+          name: name || 'RECEBEDOR',
+          city: city || 'CIDADE',
+          amount: amount,
+          txid: txid
+        });
+
+        if (qrcodeInstance) {
+          qrcodeInstance.clear();
+          qrcodeInstance.makeCode(currentPixPayload);
+        }
+      }
+    }
+
+    /* =========================================================
+       3. GESTÃO DE LOGO & UPLOAD
+       ========================================================= */
+
+    document.getElementById('logoInput').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          currentLogoDataUrl = event.target.result;
+          
+          // Preview form
+          const logoThumb = document.getElementById('logoThumb');
+          logoThumb.src = currentLogoDataUrl;
+          logoThumb.style.display = 'block';
+          document.getElementById('btnRemoveLogo').style.display = 'inline';
+
+          // Plaquinha
+          const plaqLogoImg = document.getElementById('plaqLogoImg');
+          plaqLogoImg.src = currentLogoDataUrl;
+          document.getElementById('plaqLogoWrap').style.display = 'flex';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    function removeLogo() {
+      currentLogoDataUrl = null;
+      document.getElementById('logoInput').value = '';
+      document.getElementById('logoThumb').style.display = 'none';
+      document.getElementById('btnRemoveLogo').style.display = 'none';
+      document.getElementById('plaqLogoWrap').style.display = 'none';
+    }
+
+    /* =========================================================
+       4. AÇÕES (COPIAR, BAIXAR PNG, IMPRIMIR)
+       ========================================================= */
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+    function copyPixCode() {
+      if (!currentPixPayload) {
+        showToast('Preencha a chave Pix primeiro!');
+        return;
+      }
+      navigator.clipboard.writeText(currentPixPayload).then(() => {
+        showToast('Código Pix Copia e Cola copiado!');
+      }).catch(() => {
+        showToast('Erro ao copiar código.');
+      });
+    }
+
+    function downloadQrOnly() {
+      const qrCanvas = document.querySelector('#qrcode canvas');
+      if (!qrCanvas) {
+        showToast('QR Code ainda não gerado.');
+        return;
+      }
+      const dataUrl = qrCanvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `qrcode-pix-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast('QR Code baixado com sucesso!');
+    }
+
+    function downloadPlaquinhaPng() {
+      const plaquinhaElement = document.getElementById('plaquinha');
+      if (!plaquinhaElement) return;
+
+      showToast('Gerando imagem em alta resolução...');
+
+      html2canvas(plaquinhaElement, {
+        scale: 3, // Alta resolução (3x DPI)
+        useCORS: true,
+        backgroundColor: null
+      }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `plaquinha-pix-${document.getElementById('merchantName').value.trim().toLowerCase().replace(/\s+/g, '-') || 'oficial'}.png`;
+        link.href = canvas.toDataURL('image/png');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('Plaquinha baixada com sucesso!');
+      }).catch(err => {
+        console.error('Erro no html2canvas:', err);
+        showToast('Erro ao gerar PNG da plaquinha.');
+      });
+    }
+
+    function printPlaquinha() {
+      window.print();
+    }
+
+    /* =========================================================
+       5. EVENT LISTENERS & INICIALIZAÇÃO
+       ========================================================= */
+
+    // Atualiza placeholders dinamicamente conforme tipo de chave
+    document.getElementById('keyType').addEventListener('change', function (e) {
+      const type = e.target.value;
+      const pixInput = document.getElementById('pixKey');
+      const hint = document.getElementById('keyHint');
+
+      if (type === 'celular') {
+        pixInput.placeholder = '(11) 98765-4321';
+        hint.textContent = 'Digite DDD + número do celular';
+      } else if (type === 'cpf') {
+        pixInput.placeholder = '123.456.789-00';
+        hint.textContent = 'Digite os 11 dígitos do CPF';
+      } else if (type === 'cnpj') {
+        pixInput.placeholder = '12.345.678/0001-90';
+        hint.textContent = 'Digite os 14 dígitos do CNPJ';
+      } else if (type === 'email') {
+        pixInput.placeholder = 'exemplo@seuemail.com';
+        hint.textContent = 'Digite o e-mail cadastrado no Pix';
+      } else {
+        pixInput.placeholder = '123e4567-e89b-12d3-a456-426614174000';
+        hint.textContent = 'Digite a chave aleatória gerada pelo banco';
+      }
+      updateLivePreview();
+    });
+
+    // Ouvintes de input em tempo real
+    ['pixKey', 'merchantName', 'merchantCity', 'pixAmount', 'pixTxid'].forEach(id => {
+      document.getElementById(id).addEventListener('input', updateLivePreview);
+    });
+
+    document.getElementById('showManualKeyCheckbox').addEventListener('change', updateLivePreview);
+
+    // Inicialização ao carregar a página
+    window.addEventListener('DOMContentLoaded', () => {
+      initQRCode();
+      updateLivePreview();
+    });
+  </script>
+</body>
+</html>
