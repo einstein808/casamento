@@ -457,14 +457,7 @@ export class WeddingService {
 
   // --- GIFTS ---
   static getGifts(): Gift[] {
-    const saved = getLocalItem<Gift[]>(STORAGE_KEYS.GIFTS, DEFAULT_GIFTS);
-    const missing = DEFAULT_GIFTS.filter(dg => !saved.some(sg => sg.id === dg.id));
-    if (missing.length > 0) {
-      const merged = [...missing, ...saved];
-      setLocalItem(STORAGE_KEYS.GIFTS, merged);
-      return merged;
-    }
-    return saved;
+    return getLocalItem<Gift[]>(STORAGE_KEYS.GIFTS, DEFAULT_GIFTS);
   }
 
   static saveGift(gift: Partial<Gift> & { title: string; price: number }): Gift {
@@ -610,6 +603,17 @@ export class WeddingService {
     setLocalItem(STORAGE_KEYS.GIFTS, gifts);
     if (db) {
       deleteDoc(doc(db, COLLECTIONS.GIFTS, giftId)).catch(console.warn);
+    }
+  }
+
+  static async deleteGiftAsync(giftId: string): Promise<void> {
+    this.deleteGift(giftId);
+    if (db) {
+      try {
+        await deleteDoc(doc(db, COLLECTIONS.GIFTS, giftId));
+      } catch (e) {
+        console.warn('Erro ao deletar presente no Firestore:', e);
+      }
     }
   }
 

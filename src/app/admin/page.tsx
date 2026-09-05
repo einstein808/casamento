@@ -459,9 +459,9 @@ export default function AdminDashboardPage() {
     setShowAddGiftModal(true);
   };
 
-  const handleDeleteGift = (giftId: string) => {
+  const handleDeleteGift = async (giftId: string) => {
     if (confirm('Tem certeza que deseja remover este presente da lista?')) {
-      WeddingService.deleteGift(giftId);
+      await WeddingService.deleteGiftAsync(giftId);
       reloadAll();
     }
   };
