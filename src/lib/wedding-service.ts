@@ -394,6 +394,14 @@ export class WeddingService {
     }
   }
 
+  static deleteGift(giftId: string): void {
+    const gifts = this.getGifts().filter(g => g.id !== giftId);
+    setLocalItem(STORAGE_KEYS.GIFTS, gifts);
+    if (db) {
+      deleteDoc(doc(db, COLLECTIONS.GIFTS, giftId)).catch(console.warn);
+    }
+  }
+
   static recordPixContribution(contribution: Omit<PixContribution, 'id' | 'createdAt'>): PixContribution {
     const contributions = getLocalItem<PixContribution[]>(STORAGE_KEYS.PIX_LOGS, []);
     const newContrib: PixContribution = {

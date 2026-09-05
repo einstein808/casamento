@@ -34,7 +34,9 @@ import {
   HardDrive,
   MessageSquare,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Pencil,
+  PackageCheck
 } from 'lucide-react';
 import { Guest, GuestMetrics, WeddingSettings, Gift as GiftType, PixContribution, GuestPhoto, StoryMilestone, ThemeColors, SectionId, GuestChecklistItem } from '@/lib/types';
 import { WeddingService } from '@/lib/wedding-service';
@@ -69,6 +71,7 @@ export default function AdminDashboardPage() {
   const [newGuestCompanions, setNewGuestCompanions] = useState(0);
 
   const [showAddGiftModal, setShowAddGiftModal] = useState(false);
+  const [editingGift, setEditingGift] = useState<GiftType | null>(null);
   const [newGiftTitle, setNewGiftTitle] = useState('');
   const [newGiftCategory, setNewGiftCategory] = useState<any>('casa');
   const [newGiftPrice, setNewGiftPrice] = useState('');
@@ -310,18 +313,60 @@ export default function AdminDashboardPage() {
     setTimeout(() => setDispatchStatus(null), 5000);
   };
 
-  const handleAddGift = (e: React.FormEvent) => {
+  const handleOpenAddGift = () => {
+    setEditingGift(null);
+    setNewGiftTitle('');
+    setNewGiftCategory('casa');
+    setNewGiftPrice('');
+    setNewGiftDesc('');
+    setNewGiftImage('');
+    setShowAddGiftModal(true);
+  };
+
+  const handleOpenEditGift = (gift: GiftType) => {
+    setEditingGift(gift);
+    setNewGiftTitle(gift.title);
+    setNewGiftCategory(gift.category);
+    setNewGiftPrice(gift.price.toString());
+    setNewGiftDesc(gift.description || '');
+    setNewGiftImage(gift.imageUrl || '');
+    setShowAddGiftModal(true);
+  };
+
+  const handleDeleteGift = (giftId: string) => {
+    if (confirm('Tem certeza que deseja remover este presente da lista?')) {
+      WeddingService.deleteGift(giftId);
+      reloadAll();
+    }
+  };
+
+  const handleSaveGiftModal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGiftTitle.trim() || !newGiftPrice) return;
 
-    WeddingService.saveGift({
-      title: newGiftTitle.trim(),
-      category: newGiftCategory,
-      price: parseFloat(newGiftPrice) || 50,
-      description: newGiftDesc.trim(),
-      imageUrl: newGiftImage.trim() || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
-    });
+    const priceNum = parseFloat(newGiftPrice);
+    if (isNaN(priceNum) || priceNum <= 0) return;
 
+    if (editingGift) {
+      WeddingService.saveGift({
+        ...editingGift,
+        title: newGiftTitle.trim(),
+        category: newGiftCategory,
+        price: priceNum,
+        description: newGiftDesc.trim(),
+        imageUrl: newGiftImage.trim() || editingGift.imageUrl,
+      });
+    } else {
+      WeddingService.saveGift({
+        title: newGiftTitle.trim(),
+        category: newGiftCategory,
+        price: priceNum,
+        description: newGiftDesc.trim(),
+        imageUrl: newGiftImage.trim() || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80',
+      });
+    }
+
+    setEditingGift(null);
     setNewGiftTitle('');
     setNewGiftPrice('');
     setNewGiftDesc('');
@@ -2323,7 +2368,7 @@ export default function AdminDashboardPage() {
               </div>
 
               <button
-                onClick={() => setShowAddGiftModal(true)}
+                onClick={handleOpenAddGift}
                 className="px-4 py-2.5 rounded-xl bg-[#C2847A] text-white text-xs font-semibold hover:bg-[#B07065] transition-colors flex items-center gap-1.5 shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -2333,13 +2378,33 @@ export default function AdminDashboardPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {gifts.map((gift) => (
-                <div key={gift.id} className="bg-white rounded-2xl p-4 border border-[#F0E6DF] shadow-xs flex flex-col justify-between space-y-3">
+                <div key={gift.id} className="bg-white rounded-2xl p-4 border border-[#F0E6DF] shadow-xs flex flex-col justify-between space-y-3 relative group">
                   <div className="space-y-2">
-                    <img
-                      src={gift.imageUrl}
-                      alt={gift.title}
-                      className="w-full h-32 rounded-xl object-cover"
-                    />
+                    <div className="relative overflow-hidden rounded-xl">
+                      <img
+                        src={gift.imageUrl}
+                        alt={gift.title}
+                        className="w-full h-32 object-cover"
+                      />
+                      <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditGift(gift)}
+                          className="p-1.5 rounded-lg bg-white/90 backdrop-blur-xs text-[#6B5A55] hover:text-[#C2847A] hover:bg-white shadow-xs transition-all"
+                          title="Editar Presente"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteGift(gift.id)}
+                          className="p-1.5 rounded-lg bg-white/90 backdrop-blur-xs text-red-500 hover:text-red-700 hover:bg-white shadow-xs transition-all"
+                          title="Excluir Presente"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
                     <div>
                       <span className="text-[10px] uppercase font-bold text-[#C2847A] tracking-wider">
                         {gift.category}
@@ -2376,9 +2441,19 @@ export default function AdminDashboardPage() {
                     <span className="text-sm font-bold text-[#2D2422]">
                       {formatCurrency(gift.price)}
                     </span>
-                    <span className="text-xs text-[#8D7B75]">
-                      {gift.quotaPurchased || 0} presenteado(s)
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[#8D7B75]">
+                        {gift.quotaPurchased || 0} presenteado(s)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditGift(gift)}
+                        className="text-xs text-[#C2847A] font-semibold hover:underline flex items-center gap-0.5"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        <span>Editar</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -3013,15 +3088,27 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* MODAL: Adicionar Presente */}
+      {/* MODAL: Adicionar / Editar Presente */}
       {showAddGiftModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl border border-[#F0E6DF]">
-            <h3 className="font-serif text-xl font-medium text-[#2D2422]">
-              Cadastrar Novo Presente
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-serif text-xl font-medium text-[#2D2422]">
+                {editingGift ? 'Editar Presente' : 'Cadastrar Novo Presente'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddGiftModal(false);
+                  setEditingGift(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 text-lg"
+              >
+                ✕
+              </button>
+            </div>
 
-            <form onSubmit={handleAddGift} className="space-y-4">
+            <form onSubmit={handleSaveGiftModal} className="space-y-4">
               <div>
                 <label className="block text-xs uppercase font-semibold text-[#8D7B75] mb-1">Título do Presente *</label>
                 <input
@@ -3089,7 +3176,10 @@ export default function AdminDashboardPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddGiftModal(false)}
+                  onClick={() => {
+                    setShowAddGiftModal(false);
+                    setEditingGift(null);
+                  }}
                   className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200"
                 >
                   Cancelar
@@ -3098,7 +3188,7 @@ export default function AdminDashboardPage() {
                   type="submit"
                   className="flex-1 py-2.5 rounded-xl bg-[#C2847A] text-white text-xs font-semibold hover:bg-[#B07065] shadow-xs"
                 >
-                  Salvar Presente
+                  {editingGift ? 'Salvar Alterações' : 'Cadastrar Presente'}
                 </button>
               </div>
             </form>

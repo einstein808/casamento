@@ -3,18 +3,17 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCHisiNxZa3cGLx7k0bDR20Yv9cE0aHZ_w",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "casamento-6e0c9.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "casamento-6e0c9",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "casamento-6e0c9.firebasestorage.app",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "893063251992",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:893063251992:web:e91bd0aca0a95637ad1b6d",
 };
 
 export const isFirebaseConfigured = Boolean(
-  process.env.NEXT_PUBLIC_FIREBASE_API_KEY && 
-  process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+  (process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCHisiNxZa3cGLx7k0bDR20Yv9cE0aHZ_w") && 
+  (process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "casamento-6e0c9")
 );
 
 let app: FirebaseApp;
