@@ -9,6 +9,7 @@ interface NavbarProps {
   initials?: string;
   isLightHeader?: boolean;
   showLoveStory?: boolean;
+  showRsvp?: boolean;
   sectionOrder?: SectionId[];
 }
 
@@ -16,6 +17,7 @@ export function Navbar({
   initials = 'F & G', 
   isLightHeader = false, 
   showLoveStory = true,
+  showRsvp = true,
   sectionOrder
 }: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -33,13 +35,13 @@ export function Navbar({
     historia: { name: 'Nossa História', href: '#historia', visible: showLoveStory },
     local: { name: 'O Casamento', href: '#local', visible: true },
     orientacoes: { name: 'Orientações', href: '#orientacoes', visible: true },
-    rsvp: { name: 'Presença (RSVP)', href: '#rsvp', visible: true },
+    rsvp: { name: 'Confirmar Presença', href: '#rsvp', visible: showRsvp },
     presentes: { name: 'Lista de Presentes', href: '#presentes', visible: true },
     fotos: { name: 'Mural de Fotos', href: '#fotos', visible: true },
     duvidas: { name: 'Dúvidas (FAQ)', href: '#duvidas', visible: true },
   };
 
-  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos', 'duvidas'];
+  const defaultOrder: SectionId[] = ['historia', 'local', 'rsvp', 'orientacoes', 'presentes', 'duvidas', 'fotos'];
   const activeOrder = sectionOrder && sectionOrder.length > 0 ? sectionOrder : defaultOrder;
 
   const navLinks = [
@@ -109,14 +111,16 @@ export function Navbar({
             <span>Lista de Presentes</span>
           </Link>
 
-          <Link
-            href="#rsvp"
-            onClick={(e) => handleAnchorClick(e, '#rsvp')}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold bg-[#C2847A] text-white hover:bg-[#B07065] shadow-sm transition-all hover:scale-105"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Confirmar / Reconfirmar
-          </Link>
+          {showRsvp && (
+            <Link
+              href="#rsvp"
+              onClick={(e) => handleAnchorClick(e, '#rsvp')}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold bg-[#C2847A] text-white hover:bg-[#B07065] shadow-sm transition-all hover:scale-105"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Confirmar Presença
+            </Link>
+          )}
 
           <Link
             href="/admin"
@@ -158,14 +162,16 @@ export function Navbar({
           </div>
 
           <div className="pt-2 flex flex-col gap-2.5">
-            <Link
-              href="#rsvp"
-              onClick={(e) => handleAnchorClick(e, '#rsvp')}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#C2847A] text-white font-medium text-sm shadow-sm"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Confirmar / Reconfirmar Presença
-            </Link>
+            {showRsvp && (
+              <Link
+                href="#rsvp"
+                onClick={(e) => handleAnchorClick(e, '#rsvp')}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#C2847A] text-white font-medium text-sm shadow-sm"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Confirmar Presença
+              </Link>
+            )}
 
             <Link
               href="#presentes"

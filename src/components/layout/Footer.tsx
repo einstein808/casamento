@@ -30,7 +30,11 @@ export function Footer({ settings }: FooterProps) {
         <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-white/60 tracking-widest uppercase mb-10">
           <span>{formatDate(settings.weddingDate)}</span>
           <span>•</span>
-          <span>{settings.ceremonyVenueName}</span>
+          <span>
+            {(settings.hasCeremony !== false && settings.ceremonyVenueName?.trim()) 
+              ? settings.ceremonyVenueName 
+              : (settings.receptionVenueName?.trim() || settings.ceremonyVenueName || 'Local a Definir')}
+          </span>
         </div>
 
         {/* Quick Links */}

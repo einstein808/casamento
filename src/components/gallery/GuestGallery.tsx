@@ -133,7 +133,7 @@ export function GuestGallery() {
   };
 
   return (
-    <section id="fotos" className="py-20 sm:py-28 bg-[#F7F2EE] relative">
+    <section id="fotos" className="py-10 sm:py-24 bg-[#F7F2EE] relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header with Motion */}
         <motion.div 
@@ -141,7 +141,7 @@ export function GuestGallery() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-60px' }}
           transition={{ duration: 0.8 }}
-          className="text-center space-y-3 mb-12 sm:mb-16"
+          className="text-center space-y-3 mb-8 sm:mb-14"
         >
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-[#C2847A] text-xs font-semibold tracking-wider uppercase shadow-xs">
             <Camera className="w-3.5 h-3.5" />
@@ -162,7 +162,7 @@ export function GuestGallery() {
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true, margin: '-60px' }}
           transition={{ duration: 0.7 }}
-          className="max-w-2xl mx-auto mb-16 bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-[#EADBCE]"
+          className="max-w-2xl mx-auto mb-8 sm:mb-16 bg-white rounded-3xl p-5 sm:p-8 shadow-sm border border-[#EADBCE]"
         >
           <form onSubmit={handleUpload} className="space-y-5">
             <div className="text-center space-y-1">

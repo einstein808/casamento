@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Heart, Calendar, MapPin, Gift, CheckCircle2, ChevronDown, Sparkles } from 'lucide-react';
+import { Heart, Calendar, MapPin, ChevronDown, Sparkles } from 'lucide-react';
 import { WeddingSettings } from '@/lib/types';
 import { calculateCountdown, formatDate } from '@/lib/utils';
 
@@ -29,7 +29,7 @@ export function Hero({ settings }: HeroProps) {
   }, [settings.weddingDate]);
 
   return (
-    <section id="inicio" className="relative min-h-[95vh] flex items-center justify-center pt-24 pb-16 overflow-hidden">
+    <section id="inicio" className="relative min-h-[85vh] sm:min-h-[95vh] flex items-center justify-center pt-20 sm:pt-24 pb-12 sm:pb-16 overflow-hidden">
       {/* Background Image with subtle zoom motion */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         {/* Desktop Hero Image */}
@@ -66,13 +66,13 @@ export function Hero({ settings }: HeroProps) {
       </div>
 
       {/* Floating Animated Particles */}
-      <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden w-full">
         {[...Array(6)].map((_, i) => (
           <motion.div
             key={i}
+            style={{ left: `${8 + i * 16}%` }}
             initial={{ 
               y: '100vh', 
-              x: `${15 + i * 15}vw`,
               opacity: 0 
             }}
             animate={{ 
@@ -86,7 +86,7 @@ export function Hero({ settings }: HeroProps) {
               delay: i * 2,
               ease: 'easeInOut'
             }}
-            className="absolute"
+            className="absolute bottom-0"
           >
             <Heart className="w-4 h-4 text-[#E0A899]/40 fill-[#E0A899]/30" />
           </motion.div>
@@ -129,21 +129,32 @@ export function Hero({ settings }: HeroProps) {
         </div>
 
         {/* Date and Location Badge */}
-        <motion.div 
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.8 }}
-          className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-white/90"
-        >
-          <div className="flex items-center gap-2 bg-black/35 backdrop-blur-md px-4 py-2 rounded-full border border-white/15 shadow-sm">
-            <Calendar className="w-4 h-4 text-[#E0A899]" />
-            <span className="font-medium">{formatDate(settings.weddingDate)} • às {settings.ceremonyTime}</span>
-          </div>
-          <div className="flex items-center gap-2 bg-black/35 backdrop-blur-md px-4 py-2 rounded-full border border-white/15 shadow-sm">
-            <MapPin className="w-4 h-4 text-[#E0A899]" />
-            <span className="font-medium">{settings.ceremonyVenueName}</span>
-          </div>
-        </motion.div>
+        {(() => {
+          const activeVenueName = (settings.hasCeremony !== false && settings.ceremonyVenueName?.trim())
+            ? settings.ceremonyVenueName
+            : (settings.receptionVenueName?.trim() || settings.ceremonyVenueName || 'Local a Definir');
+          const activeTime = (settings.hasCeremony !== false && settings.ceremonyTime?.trim())
+            ? settings.ceremonyTime
+            : (settings.receptionTime?.trim() || settings.ceremonyTime || '16:30');
+
+          return (
+            <motion.div 
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.8 }}
+              className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-white/90"
+            >
+              <div className="flex items-center gap-2 bg-black/35 backdrop-blur-md px-4 py-2 rounded-full border border-white/15 shadow-sm">
+                <Calendar className="w-4 h-4 text-[#E0A899]" />
+                <span className="font-medium">{formatDate(settings.weddingDate)} • às {activeTime}</span>
+              </div>
+              <div className="flex items-center gap-2 bg-black/35 backdrop-blur-md px-4 py-2 rounded-full border border-white/15 shadow-sm">
+                <MapPin className="w-4 h-4 text-[#E0A899]" />
+                <span className="font-medium">{activeVenueName}</span>
+              </div>
+            </motion.div>
+          );
+        })()}
 
         {/* Live Countdown Timer with Motion Cards */}
         <motion.div 
@@ -201,34 +212,6 @@ export function Hero({ settings }: HeroProps) {
               <span className="text-[10px] sm:text-xs text-white/70 uppercase tracking-wider">Seg</span>
             </motion.div>
           </div>
-        </motion.div>
-
-        {/* Action Buttons */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 1.2 }}
-          className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4"
-        >
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full sm:w-auto">
-            <Link
-              href="#rsvp"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-full bg-[#C2847A] text-white font-semibold text-sm sm:text-base hover:bg-[#B07065] shadow-xl shadow-[#C2847A]/40 transition-all border border-white/20"
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              <span>Confirmar Presença (RSVP)</span>
-            </Link>
-          </motion.div>
-
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full sm:w-auto">
-            <Link
-              href="#presentes"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-full bg-gradient-to-r from-amber-500 via-[#C2847A] to-rose-500 text-white font-bold text-sm sm:text-base shadow-xl shadow-amber-500/30 hover:shadow-2xl hover:shadow-amber-500/40 border-2 border-amber-300/60 transition-all hover:scale-105 active:scale-95"
-            >
-              <Gift className="w-5 h-5 text-white animate-bounce" />
-              <span>Lista de Presentes</span>
-            </Link>
-          </motion.div>
         </motion.div>
       </div>
 

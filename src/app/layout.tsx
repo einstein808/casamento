@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 
@@ -13,6 +13,12 @@ const sans = Plus_Jakarta_Sans({
   weight: ['300', '400', '500', '600', '700'],
   variable: '--font-sans',
 });
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+};
 
 export const metadata: Metadata = {
   title: 'Fernanda & Gabryel | Nosso Casamento',
@@ -35,7 +41,7 @@ export default function RootLayout({
     >
       <body 
         suppressHydrationWarning 
-        className="min-h-screen flex flex-col font-sans antialiased text-[#2D2422] bg-[#FDFBF7]"
+        className="min-h-screen flex flex-col font-sans antialiased text-[#2D2422] bg-[#FDFBF7] overflow-x-hidden w-full max-w-full"
       >
         {children}
       </body>

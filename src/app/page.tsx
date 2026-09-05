@@ -23,10 +23,26 @@ export default function HomePage() {
     // Initial local read
     setSettings(WeddingService.getSettings());
 
-    // Sync from Firebase Firestore and update
-    WeddingService.syncAllFromCloud().then(() => {
-      setSettings(WeddingService.getSettings());
+    // 1. Subscribe to real-time Firestore changes (works across all browsers and tabs)
+    const unsub = WeddingService.subscribeSettings((newSettings) => {
+      setSettings(newSettings);
     });
+
+    // 2. Fetch from API/Cloud as well for immediate sync
+    fetch('/api/settings')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.settings) {
+          setSettings(data.settings);
+        }
+      })
+      .catch(() => {});
+
+    WeddingService.syncAllFromCloud();
+
+    return () => {
+      unsub();
+    };
   }, []);
 
   if (!settings) {
@@ -40,7 +56,7 @@ export default function HomePage() {
     );
   }
 
-  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos', 'duvidas'];
+  const defaultOrder: SectionId[] = ['historia', 'local', 'rsvp', 'orientacoes', 'presentes', 'duvidas', 'fotos'];
   const activeOrder = settings.sectionOrder && settings.sectionOrder.length > 0 ? settings.sectionOrder : defaultOrder;
 
   const renderSection = (id: SectionId) => {
@@ -57,9 +73,9 @@ export default function HomePage() {
       case 'local':
         return <EventDetails key="local" settings={settings} />;
       case 'orientacoes':
-        return <DressCode key="orientacoes" settings={settings} />;
+        return settings.showOrientacoesSection !== false ? <DressCode key="orientacoes" settings={settings} /> : null;
       case 'rsvp':
-        return <RSVPSection key="rsvp" />;
+        return settings.showRsvpSection !== false ? <RSVPSection key="rsvp" /> : null;
       case 'presentes':
         return <GiftCatalog key="presentes" settings={settings} />;
       case 'fotos':
@@ -72,11 +88,12 @@ export default function HomePage() {
   };
 
   return (
-    <main className="min-h-screen flex flex-col bg-[#FDFBF7] relative">
+    <main className="min-h-screen flex flex-col bg-[#FDFBF7] relative w-full max-w-full overflow-x-hidden">
       <ThemeInjector colors={settings.themeColors} />
       <Navbar 
         initials={settings.coupleInitials || `${settings.brideName[0]} & ${settings.groomName[0]}`} 
         showLoveStory={settings.showLoveStorySection !== false && settings.loveStory && settings.loveStory.length > 0}
+        showRsvp={settings.showRsvpSection !== false}
         sectionOrder={activeOrder}
       />
       <Hero settings={settings} />

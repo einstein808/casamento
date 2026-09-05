@@ -47,7 +47,7 @@ export function EventDetails({ settings }: EventDetailsProps) {
   const isSingleCard = (hasCeremony && !hasReception) || (!hasCeremony && hasReception);
 
   return (
-    <section id="local" className="scroll-mt-24 py-20 sm:py-28 bg-[#F7F2EE] relative">
+    <section id="local" className="scroll-mt-24 py-10 sm:py-24 bg-[#F7F2EE] relative">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         {/* Header with Motion */}
         <motion.div 
@@ -55,7 +55,7 @@ export function EventDetails({ settings }: EventDetailsProps) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-60px' }}
           transition={{ duration: 0.8 }}
-          className="text-center space-y-3 mb-14 sm:mb-16"
+          className="text-center space-y-3 mb-8 sm:mb-14"
         >
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-[#C2847A] text-xs font-semibold tracking-wider uppercase shadow-xs">
             <CalendarHeart className="w-3.5 h-3.5" />
@@ -71,7 +71,7 @@ export function EventDetails({ settings }: EventDetailsProps) {
         </motion.div>
 
         {/* Cards Grid with Dynamic Layout */}
-        <div className={isSingleCard ? 'max-w-2xl mx-auto' : 'grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10'}>
+        <div className={isSingleCard ? 'max-w-2xl mx-auto' : 'grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-10'}>
           {/* Cerimônia (Opcional) */}
           {hasCeremony && (
             <motion.div 
@@ -80,7 +80,7 @@ export function EventDetails({ settings }: EventDetailsProps) {
               viewport={{ once: true, margin: '-60px' }}
               transition={{ duration: 0.7 }}
               whileHover={{ y: -6 }}
-              className="bg-white rounded-3xl p-8 sm:p-10 shadow-sm border border-[#EADBCE] flex flex-col justify-between hover:shadow-xl transition-all"
+              className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-[#EADBCE] flex flex-col justify-between hover:shadow-xl transition-all"
             >
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -153,7 +153,7 @@ export function EventDetails({ settings }: EventDetailsProps) {
               viewport={{ once: true, margin: '-60px' }}
               transition={{ duration: 0.7, delay: hasCeremony ? 0.15 : 0 }}
               whileHover={{ y: -6 }}
-              className="bg-white rounded-3xl p-8 sm:p-10 shadow-sm border border-[#EADBCE] flex flex-col justify-between hover:shadow-xl transition-all"
+              className="bg-white rounded-3xl p-6 sm:p-10 shadow-sm border border-[#EADBCE] flex flex-col justify-between hover:shadow-xl transition-all"
             >
               <div className="space-y-6">
                 <div className="flex items-center justify-between">

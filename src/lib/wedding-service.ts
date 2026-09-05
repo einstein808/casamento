@@ -19,7 +19,8 @@ import {
   setDoc, 
   getDocs, 
   collection, 
-  deleteDoc 
+  deleteDoc,
+  onSnapshot
 } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
@@ -58,11 +59,10 @@ export class WeddingService {
       const settingsDoc = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'main_settings'));
       if (settingsDoc.exists()) {
         const cloudSettings = settingsDoc.data() as WeddingSettings;
+        if (!cloudSettings.sectionOrder || cloudSettings.sectionOrder[cloudSettings.sectionOrder.length - 1] !== 'fotos' || cloudSettings.sectionOrder.indexOf('rsvp') > 3) {
+          cloudSettings.sectionOrder = ['historia', 'local', 'rsvp', 'orientacoes', 'presentes', 'duvidas', 'fotos'];
+        }
         setLocalItem(STORAGE_KEYS.SETTINGS, cloudSettings);
-      } else {
-        // Se ainda não existir no Firestore, salva os dados padrão
-        const current = this.getSettings();
-        setDoc(doc(db, COLLECTIONS.SETTINGS, 'main_settings'), current).catch(console.warn);
       }
 
       // 2. Sync Guests
@@ -73,12 +73,6 @@ export class WeddingService {
         if (cloudGuests.length > 0) {
           setLocalItem(STORAGE_KEYS.GUESTS, cloudGuests);
         }
-      } else {
-        // Inicializa convidados padrão no Firestore se vazio
-        const currentGuests = this.getGuests();
-        currentGuests.forEach(g => {
-          setDoc(doc(db!, COLLECTIONS.GUESTS, g.id), g).catch(console.warn);
-        });
       }
 
       // 3. Sync Gifts
@@ -89,11 +83,6 @@ export class WeddingService {
         if (cloudGifts.length > 0) {
           setLocalItem(STORAGE_KEYS.GIFTS, cloudGifts);
         }
-      } else {
-        const currentGifts = this.getGifts();
-        currentGifts.forEach(g => {
-          setDoc(doc(db!, COLLECTIONS.GIFTS, g.id), g).catch(console.warn);
-        });
       }
 
       // 4. Sync Pix / Contributions
@@ -127,30 +116,41 @@ export class WeddingService {
   static getSettings(): WeddingSettings {
     const s = getLocalItem<WeddingSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
 
-    // Auto-migrate old placeholders to provided credentials
-    let changed = false;
-    if (!s.minioEndpoint || s.minioEndpoint === 'localhost') {
-      s.minioEndpoint = DEFAULT_SETTINGS.minioEndpoint;
-      s.minioPort = DEFAULT_SETTINGS.minioPort;
-      s.minioUseSSL = DEFAULT_SETTINGS.minioUseSSL;
-      s.minioAccessKey = DEFAULT_SETTINGS.minioAccessKey;
-      s.minioSecretKey = DEFAULT_SETTINGS.minioSecretKey;
-      s.minioBucketName = DEFAULT_SETTINGS.minioBucketName;
-      s.minioPublicUrl = DEFAULT_SETTINGS.minioPublicUrl;
-      changed = true;
-    }
-    if (!s.evolutionApiUrl || s.evolutionApiUrl.includes('exemplo.com')) {
-      s.evolutionApiUrl = DEFAULT_SETTINGS.evolutionApiUrl;
-      s.evolutionApiKey = DEFAULT_SETTINGS.evolutionApiKey;
-      s.evolutionInstanceName = DEFAULT_SETTINGS.evolutionInstanceName;
-      changed = true;
-    }
+    // Provide safe defaults without mutating Firestore
+    return {
+      ...DEFAULT_SETTINGS,
+      ...s,
+      minioEndpoint: s.minioEndpoint || DEFAULT_SETTINGS.minioEndpoint,
+      minioPort: s.minioPort || DEFAULT_SETTINGS.minioPort,
+      minioUseSSL: s.minioUseSSL ?? DEFAULT_SETTINGS.minioUseSSL,
+      minioAccessKey: s.minioAccessKey || DEFAULT_SETTINGS.minioAccessKey,
+      minioSecretKey: s.minioSecretKey || DEFAULT_SETTINGS.minioSecretKey,
+      minioBucketName: s.minioBucketName || DEFAULT_SETTINGS.minioBucketName,
+      minioPublicUrl: s.minioPublicUrl || DEFAULT_SETTINGS.minioPublicUrl,
+      evolutionApiUrl: s.evolutionApiUrl || DEFAULT_SETTINGS.evolutionApiUrl,
+      evolutionApiKey: s.evolutionApiKey || DEFAULT_SETTINGS.evolutionApiKey,
+      evolutionInstanceName: s.evolutionInstanceName || DEFAULT_SETTINGS.evolutionInstanceName,
+      showRsvpSection: s.showRsvpSection ?? true,
+      showOrientacoesSection: s.showOrientacoesSection ?? true,
+    };
+  }
 
-    if (changed) {
-      this.saveSettings(s);
+  static subscribeSettings(callback: (settings: WeddingSettings) => void): () => void {
+    if (!db || typeof window === 'undefined') return () => {};
+    try {
+      const unsub = onSnapshot(doc(db, COLLECTIONS.SETTINGS, 'main_settings'), (docSnap) => {
+        if (docSnap.exists()) {
+          const cloudSettings = docSnap.data() as WeddingSettings;
+          setLocalItem(STORAGE_KEYS.SETTINGS, cloudSettings);
+          callback(cloudSettings);
+        }
+      }, (err) => {
+        console.warn('Erro ao escutar settings no Firestore:', err);
+      });
+      return unsub;
+    } catch {
+      return () => {};
     }
-
-    return s;
   }
 
   static saveSettings(settings: WeddingSettings): WeddingSettings {

@@ -14,6 +14,8 @@ export const DEFAULT_SETTINGS: WeddingSettings = {
   receptionAddress: 'Av. das Flores, 1550 (Mesmo complexo) - São Paulo - SP',
   receptionTime: '18:30',
   receptionMapsUrl: 'https://maps.google.com/?q=Jardim+Botanico+Sao+Paulo',
+  showOrientacoesSection: true,
+  showRsvpSection: true,
   dressCodeTitle: 'Passeio Completo / Traje Social',
   dressCodeDescription: 'Para as mulheres: vestidos longos ou mídi em tons suaves ou alegres (pedimos gentilmente evitar branco, off-white e tons de marfim). Para os homens: terno com gravata ou blazer elegante.',
   dressCodeColors: ['#E0A899', '#C2847A', '#8EA89D', '#D9C5B2', '#5B7065', '#2E4057'],

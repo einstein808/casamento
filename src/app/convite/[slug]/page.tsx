@@ -40,14 +40,30 @@ export default function InvitePage({ params }: InvitePageProps) {
     }
     setLoading(false);
 
-    // Sync from Firestore in background
-    WeddingService.syncAllFromCloud().then(() => {
-      setSettings(WeddingService.getSettings());
+    // 1. Real-time Firestore subscription
+    const unsub = WeddingService.subscribeSettings((newSettings) => {
+      setSettings(newSettings);
       if (resolvedParams.slug) {
         const g = WeddingService.getGuestBySlug(resolvedParams.slug);
         setGuest(g || null);
       }
     });
+
+    // 2. Fetch from API
+    fetch('/api/settings')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.settings) {
+          setSettings(data.settings);
+        }
+      })
+      .catch(() => {});
+
+    WeddingService.syncAllFromCloud();
+
+    return () => {
+      unsub();
+    };
   }, [resolvedParams.slug]);
 
   if (loading || !settings) {
@@ -61,7 +77,7 @@ export default function InvitePage({ params }: InvitePageProps) {
     );
   }
 
-  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos', 'duvidas'];
+  const defaultOrder: SectionId[] = ['historia', 'local', 'rsvp', 'orientacoes', 'presentes', 'duvidas', 'fotos'];
   const activeOrder = settings.sectionOrder && settings.sectionOrder.length > 0 ? settings.sectionOrder : defaultOrder;
 
   const renderSection = (id: SectionId) => {
@@ -78,9 +94,9 @@ export default function InvitePage({ params }: InvitePageProps) {
       case 'local':
         return <EventDetails key="local" settings={settings} />;
       case 'orientacoes':
-        return <DressCode key="orientacoes" settings={settings} />;
+        return settings.showOrientacoesSection !== false ? <DressCode key="orientacoes" settings={settings} /> : null;
       case 'rsvp':
-        return <RSVPSection key="rsvp" initialGuest={guest} />;
+        return settings.showRsvpSection !== false ? <RSVPSection key="rsvp" initialGuest={guest} /> : null;
       case 'presentes':
         return <GiftCatalog key="presentes" settings={settings} />;
       case 'fotos':
@@ -93,11 +109,12 @@ export default function InvitePage({ params }: InvitePageProps) {
   };
 
   return (
-    <main className="min-h-screen flex flex-col bg-[#FDFBF7] relative">
+    <main className="min-h-screen flex flex-col bg-[#FDFBF7] relative w-full max-w-full overflow-x-hidden">
       <ThemeInjector colors={settings.themeColors} />
       <Navbar 
         initials={settings.coupleInitials || `${settings.brideName[0]} & ${settings.groomName[0]}`} 
         showLoveStory={settings.showLoveStorySection !== false && settings.loveStory && settings.loveStory.length > 0}
+        showRsvp={settings.showRsvpSection !== false}
         sectionOrder={activeOrder}
       />
 

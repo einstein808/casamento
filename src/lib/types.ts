@@ -129,6 +129,8 @@ export interface WeddingSettings {
   receptionTime: string;
   receptionMapsUrl: string;
   
+  showOrientacoesSection?: boolean;
+  showRsvpSection?: boolean;
   dressCodeTitle: string;
   dressCodeDescription: string;
   dressCodeColors: string[];

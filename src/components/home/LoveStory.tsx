@@ -18,7 +18,7 @@ export function LoveStory({ milestones }: LoveStoryProps) {
   }
 
   return (
-    <section id="historia" className="scroll-mt-24 py-20 sm:py-28 bg-[#FDFBF7] relative overflow-hidden">
+    <section id="historia" className="scroll-mt-24 py-10 sm:py-24 bg-[#FDFBF7] relative overflow-hidden">
       <div className="max-w-5xl mx-auto px-4 sm:px-6">
         {/* Section Header */}
         <motion.div 
@@ -26,7 +26,7 @@ export function LoveStory({ milestones }: LoveStoryProps) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-60px' }}
           transition={{ duration: 0.8 }}
-          className="text-center space-y-3 mb-16 sm:mb-20"
+          className="text-center space-y-3 mb-8 sm:mb-16"
         >
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F5ECE5] text-[#C2847A] text-xs font-semibold tracking-wider uppercase">
             <Sparkles className="w-3.5 h-3.5" />
@@ -46,7 +46,7 @@ export function LoveStory({ milestones }: LoveStoryProps) {
           {/* Central line for desktop */}
           <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-0.5 bg-[#E8DCD5] -translate-x-1/2" />
 
-          <div className="space-y-12 sm:space-y-16">
+          <div className="space-y-6 sm:space-y-12">
             {milestones.map((item, index) => {
               const isEven = index % 2 === 0;
 
@@ -70,10 +70,10 @@ export function LoveStory({ milestones }: LoveStoryProps) {
 
                   {/* Content Card with Framer Motion */}
                   <motion.div 
-                    initial={{ opacity: 0, x: isEven ? 50 : -50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true, margin: '-80px' }}
-                    transition={{ duration: 0.7, ease: 'easeOut' }}
+                    initial={{ opacity: 0, y: 25 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '-50px' }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
                     className="w-full md:w-1/2"
                   >
                     <motion.div 
@@ -97,10 +97,10 @@ export function LoveStory({ milestones }: LoveStoryProps) {
 
                   {/* Photo with Framer Motion */}
                   <motion.div 
-                    initial={{ opacity: 0, x: isEven ? -50 : 50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true, margin: '-80px' }}
-                    transition={{ duration: 0.7, ease: 'easeOut', delay: 0.1 }}
+                    initial={{ opacity: 0, y: 25 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '-50px' }}
+                    transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 }}
                     className="w-full md:w-1/2"
                   >
                     {item.imageUrl && (

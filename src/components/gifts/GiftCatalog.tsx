@@ -9,7 +9,8 @@ import {
   Search, 
   DollarSign,
   Lock,
-  PackageCheck
+  PackageCheck,
+  Plus
 } from 'lucide-react';
 import { Gift, WeddingSettings } from '@/lib/types';
 import { WeddingService } from '@/lib/wedding-service';
@@ -25,6 +26,7 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [activeGiftModal, setActiveGiftModal] = useState<Gift | null>(null);
+  const [visibleCount, setVisibleCount] = useState<number>(3);
 
   const loadGifts = () => {
     setGifts(WeddingService.getGifts());
@@ -36,6 +38,10 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
       loadGifts();
     });
   }, []);
+
+  useEffect(() => {
+    setVisibleCount(3);
+  }, [selectedCategory, searchTerm]);
 
   const categories: { id: string; label: string }[] = [
     { id: 'all', label: 'Todos os Presentes' },
@@ -74,6 +80,8 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
   };
 
   const filteredGifts = getDisplayGifts();
+  const visibleGifts = filteredGifts.slice(0, visibleCount);
+  const hasMoreGifts = filteredGifts.length > visibleCount;
 
   const handleCustomGift = () => {
     const custom: Gift = {
@@ -89,7 +97,7 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
   };
 
   return (
-    <section id="presentes" className="scroll-mt-24 py-20 sm:py-28 bg-[#FDFBF7] relative">
+    <section id="presentes" className="scroll-mt-24 py-10 sm:py-24 bg-[#FDFBF7] relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header with Framer Motion */}
         <motion.div 
@@ -97,7 +105,7 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-60px' }}
           transition={{ duration: 0.8 }}
-          className="text-center space-y-3 mb-10 sm:mb-14"
+          className="text-center space-y-3 mb-6 sm:mb-14"
         >
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF3EE] text-[#C2847A] text-xs font-semibold tracking-wider uppercase shadow-xs">
             <GiftIcon className="w-3.5 h-3.5" />
@@ -150,7 +158,7 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8"
         >
           <AnimatePresence>
-            {filteredGifts.map((gift) => (
+            {visibleGifts.map((gift) => (
               <motion.div
                 key={gift.id}
                 layout
@@ -202,7 +210,7 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={() => setActiveGiftModal(gift)}
-                      className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-[#C2847A] to-rose-500 text-white font-bold text-xs hover:shadow-lg hover:shadow-amber-500/25 transition-all flex items-center justify-center gap-2 shadow-xs"
+                      className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-[#C2847A] to-rose-500 text-white font-bold text-xs hover:shadow-lg hover:shadow-amber-500/25 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer"
                     >
                       <Heart className="w-4 h-4 fill-white" />
                       <span>
@@ -237,13 +245,28 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               onClick={handleCustomGift}
-              className="w-full py-2.5 rounded-xl bg-[#C2847A] text-white font-semibold text-xs hover:bg-[#B07065] transition-all flex items-center justify-center gap-1.5 shadow-xs"
+              className="w-full py-2.5 rounded-xl bg-[#C2847A] text-white font-semibold text-xs hover:bg-[#B07065] transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
             >
               <DollarSign className="w-3.5 h-3.5" />
               <span>Escolher Valor Livre</span>
             </motion.button>
           </motion.div>
         </motion.div>
+
+        {/* Load More Button */}
+        {hasMoreGifts && (
+          <div className="text-center pt-8 sm:pt-10">
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => setVisibleCount((prev) => prev + 3)}
+              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-white text-[#C2847A] border-2 border-[#C2847A] hover:bg-[#C2847A] hover:text-white font-semibold text-xs sm:text-sm shadow-sm hover:shadow-md transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Ver Mais Presentes ({filteredGifts.length - visibleCount} restantes)</span>
+            </motion.button>
+          </div>
+        )}
       </div>
 
       {/* PIX Modal */}

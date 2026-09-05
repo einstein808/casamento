@@ -481,7 +481,7 @@ export default function AdminDashboardPage() {
                 Painel dos Noivos • {settings.brideName} & {settings.groomName}
               </h1>
               <p className="text-xs text-[#8D7B75]">
-                {formatDate(settings.weddingDate)} • {settings.ceremonyVenueName}
+                {formatDate(settings.weddingDate)} • {(settings.hasCeremony !== false && settings.ceremonyVenueName?.trim()) ? settings.ceremonyVenueName : (settings.receptionVenueName?.trim() || settings.ceremonyVenueName || 'Local a Definir')}
               </p>
             </div>
           </div>
@@ -1101,7 +1101,7 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos', 'duvidas'];
+                    const defaultOrder: SectionId[] = ['historia', 'local', 'rsvp', 'orientacoes', 'presentes', 'duvidas', 'fotos'];
                     const updated = { ...settings, sectionOrder: defaultOrder };
                     setSettings(updated);
                     WeddingService.saveSettings(updated);
@@ -1114,7 +1114,7 @@ export default function AdminDashboardPage() {
 
               <div className="space-y-2.5 pt-2">
                 {(() => {
-                  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos', 'duvidas'];
+                  const defaultOrder: SectionId[] = ['historia', 'local', 'rsvp', 'orientacoes', 'presentes', 'duvidas', 'fotos'];
                   const order = settings.sectionOrder && settings.sectionOrder.length > 0 ? settings.sectionOrder : defaultOrder;
 
                   const sectionMeta: Record<SectionId, { title: string; desc: string; tag: string }> = {
@@ -1134,7 +1134,7 @@ export default function AdminDashboardPage() {
                       tag: '#orientacoes',
                     },
                     rsvp: {
-                      title: 'Confirmação de Presença (RSVP)',
+                      title: 'Confirmação de Presença',
                       desc: 'Formulário de confirmação de presença e acompanhantes',
                       tag: '#rsvp',
                     },
@@ -1497,10 +1497,31 @@ export default function AdminDashboardPage() {
 
             {/* Orientações aos Convidados */}
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#F0E6DF] shadow-xs space-y-6">
-              <h3 className="font-serif text-lg font-semibold text-[#2D2422] flex items-center gap-2">
-                <Palette className="w-5 h-5 text-[#C2847A]" />
-                <span>4. Orientações aos Convidados (Trajes & Dicas)</span>
-              </h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+                <div>
+                  <h3 className="font-serif text-lg font-semibold text-[#2D2422] flex items-center gap-2">
+                    <Palette className="w-5 h-5 text-[#C2847A]" />
+                    <span>4. Orientações aos Convidados (Trajes & Dicas)</span>
+                  </h3>
+                  <p className="text-xs text-[#8D7B75]">
+                    Personalize trajes sugeridos, checklist de orientações (ex: open cooler, horários, etc.)
+                  </p>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#2D2422] bg-[#FAF3EE] px-3 py-1.5 rounded-xl border border-[#EADBCE]">
+                  <input
+                    type="checkbox"
+                    checked={settings.showOrientacoesSection !== false}
+                    onChange={(e) => {
+                      const updated = { ...settings, showOrientacoesSection: e.target.checked };
+                      setSettings(updated);
+                      WeddingService.saveSettings(updated);
+                    }}
+                    className="rounded accent-[#C2847A]"
+                  />
+                  <span>Ativar seção no site</span>
+                </label>
+              </div>
 
               <div className="space-y-4">
                 <div>
@@ -1753,15 +1774,15 @@ export default function AdminDashboardPage() {
                           setSettings(updated);
                           WeddingService.saveSettings(updated);
                         }}
-                        className="px-3 py-1 rounded-lg bg-[#C2847A] text-white text-xs font-semibold hover:bg-[#B07065] transition-colors flex items-center gap-1 shadow-xs"
+                        className="px-2.5 py-1 rounded-lg bg-[#C2847A] text-white text-xs font-medium hover:bg-[#B07065] transition-colors flex items-center gap-1 shadow-xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>Adicionar Dúvida</span>
+                        <span>Adicionar Pergunta</span>
                       </button>
                     </div>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-3 pt-2">
                     {(() => {
                       const defaultFaqs = [
                         {
@@ -1774,7 +1795,7 @@ export default function AdminDashboardPage() {
                         },
                         {
                           q: 'Haverá opções vegetarianas / sem glúten no menu?',
-                          a: 'Com certeza! No momento da confirmação de presença (RSVP), você pode informar qualquer restrição alimentar que nossa equipe do buffet providenciará.',
+                          a: 'Com certeza! No momento da confirmação de presença, você pode informar qualquer restrição alimentar que nossa equipe do buffet providenciará.',
                         },
                       ];
                       const list = settings.faqs !== undefined ? settings.faqs : defaultFaqs;
@@ -1848,13 +1869,48 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {/* 5. Paleta de Cores e Temas do Site */}
+            {/* Confirmação de Presença */}
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#F0E6DF] shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-serif text-lg font-semibold text-[#2D2422] flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-[#C2847A]" />
+                    <span>5. Confirmação de Presença</span>
+                  </h3>
+                  <p className="text-xs text-[#8D7B75]">
+                    Ative ou oculte o formulário e os botões de confirmação de presença no site dos convidados
+                  </p>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-[#2D2422] bg-[#FAF3EE] px-3.5 py-2 rounded-xl border border-[#EADBCE] hover:bg-[#F5EAE1] transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={settings.showRsvpSection !== false}
+                    onChange={(e) => {
+                      const updated = { ...settings, showRsvpSection: e.target.checked };
+                      setSettings(updated);
+                      WeddingService.saveSettings(updated);
+                    }}
+                    className="rounded accent-[#C2847A] w-4 h-4"
+                  />
+                  <span>{settings.showRsvpSection !== false ? 'Seção Ativada no Site' : 'Seção Oculta (Desativada)'}</span>
+                </label>
+              </div>
+
+              {settings.showRsvpSection === false && (
+                <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-xs text-amber-800 flex items-center gap-2">
+                  <span>ℹ️ A seção e os botões de confirmação de presença estão <strong>totalmente ocultos</strong> da página inicial, do menu e do rodapé.</span>
+                </div>
+              )}
+            </div>
+
+            {/* 6. Paleta de Cores e Temas do Site */}
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#F0E6DF] shadow-xs space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-serif text-lg font-semibold text-[#2D2422] flex items-center gap-2">
                     <Palette className="w-5 h-5 text-[#C2847A]" />
-                    <span>5. Paleta de Cores & Identidade Visual do Site</span>
+                    <span>6. Paleta de Cores & Identidade Visual do Site</span>
                   </h3>
                   <p className="text-xs text-[#8D7B75]">
                     Escolha um tema pronto de casamento ou personalize cada cor como desejar
@@ -2189,7 +2245,7 @@ export default function AdminDashboardPage() {
                   <thead className="bg-[#FAF3EE] border-b border-[#EADBCE] text-[#6B5A55] uppercase tracking-wider font-semibold">
                     <tr>
                       <th className="py-3.5 px-4">Convidado</th>
-                      <th className="py-3.5 px-4">Status RSVP</th>
+                      <th className="py-3.5 px-4">Status Presença</th>
                       <th className="py-3.5 px-4">Acompanhantes</th>
                       <th className="py-3.5 px-4">Restrições / Mensagem</th>
                       <th className="py-3.5 px-4 text-center">Presença no Dia</th>

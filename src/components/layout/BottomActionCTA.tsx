@@ -24,11 +24,11 @@ export function BottomActionCTA({ settings }: BottomActionCTAProps) {
   };
 
   return (
-    <section className="py-16 sm:py-20 bg-gradient-to-b from-[#FAF3EE]/60 to-[#FDFBF7] border-t border-[#F0E6DF] relative overflow-hidden">
+    <section className="py-10 sm:py-20 bg-gradient-to-b from-[#FAF3EE]/60 to-[#FDFBF7] border-t border-[#F0E6DF] relative overflow-hidden">
       {/* Background Decorative Rings */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#C2847A]/5 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-6 relative z-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-4 sm:space-y-6 relative z-10">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           whileInView={{ opacity: 1, scale: 1 }}
@@ -57,7 +57,9 @@ export function BottomActionCTA({ settings }: BottomActionCTAProps) {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="text-sm sm:text-base text-[#6B5A55] max-w-xl mx-auto font-light leading-relaxed"
         >
-          Confirme sua presença com antecedência para nos ajudar na organização e confira nossa lista de presentes com carinho.
+          {settings.showRsvpSection !== false 
+            ? 'Confirme sua presença com antecedência para nos ajudar na organização e confira nossa lista de presentes com carinho.'
+            : 'Confira nossa lista de presentes com carinho e celebre conosco esse momento inesquecível.'}
         </motion.p>
 
         {/* Action Buttons */}
@@ -68,14 +70,16 @@ export function BottomActionCTA({ settings }: BottomActionCTAProps) {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md sm:max-w-none mx-auto"
         >
-          <Link
-            href="#rsvp"
-            onClick={(e) => handleAnchorClick(e, '#rsvp')}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 rounded-2xl bg-[#C2847A] text-white font-semibold text-sm sm:text-base shadow-lg shadow-[#C2847A]/30 hover:bg-[#B07065] transition-all hover:scale-105 active:scale-95"
-          >
-            <CheckCircle2 className="w-5 h-5" />
-            <span>Confirmar / Reconfirmar Presença</span>
-          </Link>
+          {settings.showRsvpSection !== false && (
+            <Link
+              href="#rsvp"
+              onClick={(e) => handleAnchorClick(e, '#rsvp')}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 rounded-2xl bg-[#C2847A] text-white font-semibold text-sm sm:text-base shadow-lg shadow-[#C2847A]/30 hover:bg-[#B07065] transition-all hover:scale-105 active:scale-95"
+            >
+              <CheckCircle2 className="w-5 h-5" />
+              <span>Confirmar Presença</span>
+            </Link>
+          )}
 
           <Link
             href="#presentes"

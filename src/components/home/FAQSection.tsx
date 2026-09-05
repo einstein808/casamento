@@ -21,7 +21,7 @@ export function FAQSection({ settings }: FAQSectionProps) {
     },
     {
       q: 'Haverá opções vegetarianas / sem glúten no menu?',
-      a: 'Com certeza! No momento da confirmação de presença (RSVP), você pode informar qualquer restrição alimentar que nossa equipe do buffet providenciará.',
+      a: 'Com certeza! No momento da confirmação de presença, você pode informar qualquer restrição alimentar que nossa equipe do buffet providenciará.',
     },
   ];
 
@@ -30,7 +30,7 @@ export function FAQSection({ settings }: FAQSectionProps) {
   if (!activeFaqs || activeFaqs.length === 0) return null;
 
   return (
-    <section id="duvidas" className="scroll-mt-24 py-20 sm:py-28 bg-[#FAF3EE]/40 relative border-t border-[#F0E6DF]">
+    <section id="duvidas" className="scroll-mt-24 py-10 sm:py-24 bg-[#FAF3EE]/40 relative border-t border-[#F0E6DF]">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header with Motion */}
         <motion.div 
@@ -38,7 +38,7 @@ export function FAQSection({ settings }: FAQSectionProps) {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-60px' }}
           transition={{ duration: 0.8 }}
-          className="text-center space-y-3 mb-12 sm:mb-16"
+          className="text-center space-y-3 mb-8 sm:mb-14"
         >
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-[#C2847A] text-xs font-semibold tracking-wider uppercase shadow-xs border border-[#EADBCE]">
             <Sparkles className="w-3.5 h-3.5" />
