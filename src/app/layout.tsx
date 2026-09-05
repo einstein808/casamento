@@ -21,10 +21,38 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Fernanda & Gabryel | Nosso Casamento',
-  description: 'Com muita alegria convidamos você para celebrar o nosso amor e o início do nosso para sempre.',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://casamento.local'),
+  title: 'Fernanda & Gabryel | Nosso Casamento 💍',
+  description: 'Com muita alegria convidamos você para celebrar o nosso amor e o início do nosso para sempre! Acesse para confirmar sua presença e ver todos os detalhes.',
+  openGraph: {
+    title: 'Fernanda & Gabryel | Nosso Casamento 💍',
+    description: 'Com muita alegria convidamos você para celebrar o nosso grande dia! Acesse para confirmar sua presença e ver todos os detalhes.',
+    type: 'website',
+    locale: 'pt_BR',
+    siteName: 'Casamento Fernanda & Gabryel',
+    images: [
+      {
+        url: '/api/og',
+        width: 600,
+        height: 600,
+        alt: 'Foto dos Noivos - Fernanda & Gabryel',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Fernanda & Gabryel | Nosso Casamento 💍',
+    description: 'Com muita alegria convidamos você para celebrar o nosso grande dia!',
+    images: ['/api/og'],
+  },
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
   },
 };
 
