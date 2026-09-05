@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Heart, Calendar, MapPin, ChevronDown, Sparkles } from 'lucide-react';
 import { WeddingSettings } from '@/lib/types';
 import { calculateCountdown, formatDate } from '@/lib/utils';
+import { FloatingHearts } from '@/components/layout/FloatingHearts';
 
 interface HeroProps {
   settings: WeddingSettings;
@@ -65,33 +66,8 @@ export function Hero({ settings }: HeroProps) {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-black/30 to-black/80" />
       </div>
 
-      {/* Floating Animated Particles */}
-      <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden w-full">
-        {[...Array(6)].map((_, i) => (
-          <motion.div
-            key={i}
-            style={{ left: `${8 + i * 16}%` }}
-            initial={{ 
-              y: '100vh', 
-              opacity: 0 
-            }}
-            animate={{ 
-              y: '-10vh', 
-              opacity: [0, 0.6, 0.8, 0],
-              scale: [0.8, 1.2, 0.9]
-            }}
-            transition={{
-              duration: 10 + i * 3,
-              repeat: Infinity,
-              delay: i * 2,
-              ease: 'easeInOut'
-            }}
-            className="absolute bottom-0"
-          >
-            <Heart className="w-4 h-4 text-[#E0A899]/40 fill-[#E0A899]/30" />
-          </motion.div>
-        ))}
-      </div>
+      {/* Floating Animated Hearts Rising */}
+      <FloatingHearts count={20} />
 
       {/* Hero Content with Staggered Framer Motion */}
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center text-white space-y-6 sm:space-y-8">
