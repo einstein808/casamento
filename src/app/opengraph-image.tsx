@@ -1,5 +1,4 @@
 import { ImageResponse } from 'next/og';
-import { NextRequest } from 'next/server';
 import { db, COLLECTIONS } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { DEFAULT_SETTINGS } from '@/lib/default-data';
@@ -9,11 +8,17 @@ import { GetObjectCommand } from '@aws-sdk/client-s3';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const alt = 'Fernanda & Gabryel | Nosso Casamento 💍';
+export const size = {
+  width: 600,
+  height: 600,
+};
+export const contentType = 'image/png';
 
 async function fetchImageBase64(url: string, settings?: Partial<WeddingSettings>): Promise<string | null> {
   if (!url) return null;
 
-  // 1. If it's stored in MinIO (/api/media/filename or raw filename)
+  // 1. MinIO / S3 internal storage
   if (url.startsWith('/api/media/') || (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:'))) {
     try {
       const cleanKey = decodeURIComponent(url.replace(/^\/api\/media\//, ''));
@@ -33,16 +38,16 @@ async function fetchImageBase64(url: string, settings?: Partial<WeddingSettings>
         }
       }
     } catch (err) {
-      console.warn('Could not fetch image from MinIO for OG:', err);
+      console.warn('Could not fetch image from MinIO for opengraph-image:', err);
     }
   }
 
-  // 2. If it's already a Data URL
+  // 2. Data URL
   if (url.startsWith('data:')) {
     return url;
   }
 
-  // 3. If it's an external HTTP/HTTPS URL
+  // 3. External HTTP/HTTPS URL
   if (url.startsWith('http://') || url.startsWith('https://')) {
     try {
       const response = await fetch(url);
@@ -53,18 +58,15 @@ async function fetchImageBase64(url: string, settings?: Partial<WeddingSettings>
         return `data:${contentType};base64,${buffer.toString('base64')}`;
       }
     } catch (err) {
-      console.warn('Could not fetch image from external URL for OG:', err);
+      console.warn('Could not fetch image from external URL for opengraph-image:', err);
     }
   }
 
   return null;
 }
 
-export async function GET(req: NextRequest) {
+export default async function OpenGraphImage() {
   try {
-    const { searchParams } = new URL(req.url);
-
-    // 1. Fetch current wedding settings from Firestore
     let currentSettings: WeddingSettings = DEFAULT_SETTINGS;
     if (db) {
       try {
@@ -73,18 +75,17 @@ export async function GET(req: NextRequest) {
           currentSettings = { ...DEFAULT_SETTINGS, ...(snap.data() as WeddingSettings) };
         }
       } catch (err) {
-        console.warn('Error reading settings for OG:', err);
+        console.warn('Error reading settings for opengraph-image:', err);
       }
     }
 
-    const bride = searchParams.get('bride') || currentSettings.brideName || 'Fernanda';
-    const groom = searchParams.get('groom') || currentSettings.groomName || 'Gabryel';
-    const rawPhotoUrl = searchParams.get('photo') || 
+    const bride = currentSettings.brideName || 'Fernanda';
+    const groom = currentSettings.groomName || 'Gabryel';
+    const rawPhotoUrl = 
       currentSettings.heroBackgroundMobileImageUrl ||
       currentSettings.heroBackgroundImageUrl || 
       'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80';
 
-    // 2. Convert photo to Base64 DataURL for 100% reliable rendering in Satori
     let photoDataUrl = await fetchImageBase64(rawPhotoUrl, currentSettings);
 
     if (!photoDataUrl && rawPhotoUrl !== 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80') {
@@ -201,15 +202,11 @@ export async function GET(req: NextRequest) {
         </div>
       ),
       {
-        width: 600,
-        height: 600,
-        headers: {
-          'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
-        },
+        ...size,
       }
     );
   } catch (e: any) {
-    console.error('Error generating OG image:', e);
+    console.error('Error generating opengraph-image:', e);
     return new Response(`Failed to generate the image: ${e?.message || e}`, {
       status: 500,
     });
