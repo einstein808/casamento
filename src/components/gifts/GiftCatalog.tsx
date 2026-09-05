@@ -54,6 +54,8 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
 
   const getDisplayGifts = () => {
     const baseList = gifts.filter((gift) => {
+      // Oculta presentes que já foram reservados para entrega física no dia
+      if (gift.reservedInPerson) return false;
       const matchesCategory = selectedCategory === 'all' || gift.category === selectedCategory;
       const matchesSearch = gift.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             gift.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -260,10 +262,13 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.96 }}
               onClick={() => setVisibleCount((prev) => prev + 3)}
-              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-white text-[#C2847A] border-2 border-[#C2847A] hover:bg-[#C2847A] hover:text-white font-semibold text-xs sm:text-sm shadow-sm hover:shadow-md transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-[#2D2422] text-white hover:bg-black font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
+              style={{ color: '#ffffff', backgroundColor: '#2D2422' }}
             >
-              <Plus className="w-4 h-4" />
-              <span>Ver Mais Presentes ({filteredGifts.length - visibleCount} restantes)</span>
+              <Plus className="w-4 h-4 text-white" />
+              <span className="text-white font-bold" style={{ color: '#ffffff' }}>
+                Ver Mais Presentes ({filteredGifts.length - visibleCount} restantes)
+              </span>
             </motion.button>
           </div>
         )}

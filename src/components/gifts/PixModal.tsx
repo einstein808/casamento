@@ -16,10 +16,11 @@ import {
   PackageCheck
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Gift, WeddingSettings } from '@/lib/types';
+import { Gift, WeddingSettings, Guest } from '@/lib/types';
 import { generatePixPayload, generatePixQrCode } from '@/lib/pix';
 import { WeddingService } from '@/lib/wedding-service';
 import { formatCurrency } from '@/lib/utils';
+import { Search, AlertTriangle } from 'lucide-react';
 
 interface PixModalProps {
   gift: Gift | null;
@@ -30,12 +31,14 @@ interface PixModalProps {
 }
 
 export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModalProps) {
-  const [step, setStep] = useState<'form' | 'pix' | 'success'>('form');
+  const [step, setStep] = useState<'form' | 'in_person_confirm' | 'pix' | 'success'>('form');
   const [method, setMethod] = useState<'pix' | 'in_person'>('pix');
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [guestMessage, setGuestMessage] = useState('');
   const [customAmount, setCustomAmount] = useState<number>(0);
+  const [guestList, setGuestList] = useState<Guest[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   
   const [pixPayload, setPixPayload] = useState('');
   const [qrCodeUrl, setQrCodeUrl] = useState('');
@@ -53,6 +56,10 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
       setCopied(false);
       setErrorMsg('');
       setCustomAmount(gift?.price || 100);
+      setGuestList(WeddingService.getGuests());
+      WeddingService.syncAllFromCloud().then(() => {
+        setGuestList(WeddingService.getGuests());
+      });
     }
   }, [isOpen, gift]);
 
@@ -61,9 +68,22 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
   const finalAmount = gift.price > 0 ? gift.price : (customAmount || 100);
   const isPhysicalAlreadyReserved = Boolean(gift.reservedInPerson);
 
-  const handleGeneratePix = async (e: React.FormEvent) => {
+  const filteredGuestSuggestions = guestName.trim().length > 1
+    ? guestList.filter(g => g.name.toLowerCase().includes(guestName.toLowerCase())).slice(0, 5)
+    : [];
+
+  const handleSelectSuggestedGuest = (guest: Guest) => {
+    setGuestName(guest.name);
+    if (guest.phone) setGuestPhone(guest.phone);
+    setShowSuggestions(false);
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!guestName.trim()) return;
+    if (!guestName.trim()) {
+      setErrorMsg('Por favor, informe seu nome para os noivos.');
+      return;
+    }
 
     if (method === 'in_person') {
       if (isPhysicalAlreadyReserved) {
@@ -71,26 +91,8 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
         return;
       }
 
-      const res = WeddingService.reserveGiftInPerson(
-        gift.id, 
-        guestName.trim(), 
-        guestPhone.trim(), 
-        guestMessage.trim()
-      );
-
-      if (!res.success) {
-        setErrorMsg(res.error || 'Não foi possível reservar este item.');
-        return;
-      }
-
-      setStep('success');
-      confetti({
-        particleCount: 150,
-        spread: 80,
-        origin: { y: 0.6 },
-        colors: ['#c2847a', '#d9c5b2', '#e0a899', '#fdfbf7', '#2e4057'],
-      });
-      onSuccess();
+      // Step 2: Open Double Confirmation Step
+      setStep('in_person_confirm');
       return;
     }
 
@@ -114,6 +116,30 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleConfirmInPersonReservation = () => {
+    const res = WeddingService.reserveGiftInPerson(
+      gift.id, 
+      guestName.trim(), 
+      guestPhone.trim(), 
+      guestMessage.trim()
+    );
+
+    if (!res.success) {
+      setErrorMsg(res.error || 'Não foi possível reservar este item.');
+      setStep('form');
+      return;
+    }
+
+    setStep('success');
+    confetti({
+      particleCount: 150,
+      spread: 80,
+      origin: { y: 0.6 },
+      colors: ['#c2847a', '#d9c5b2', '#e0a899', '#fdfbf7', '#2e4057'],
+    });
+    onSuccess();
   };
 
   const handleCopyPix = () => {
@@ -176,7 +202,7 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
         {/* Modal Body */}
         <div className="p-6 sm:p-8 overflow-y-auto flex-1">
           {step === 'form' && (
-            <form onSubmit={handleGeneratePix} className="space-y-5">
+            <form onSubmit={handleFormSubmit} className="space-y-5">
               {/* Product preview card */}
               <div className="flex items-center gap-4 p-4 rounded-2xl bg-[#FDFBF7] border border-[#F0E6DF]">
                 <img
@@ -268,32 +294,63 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
                 )}
               </div>
 
-              {/* Guest name */}
-              <div className="space-y-1.5">
+              {/* Guest name with suggestions */}
+              <div className="space-y-1.5 relative">
                 <label className="block text-xs uppercase tracking-wider text-[#8D7B75] font-semibold">
-                  Seu Nome ou Família: <span className="text-[#C2847A]">*</span>
+                  {method === 'in_person' ? 'Busque seu nome na lista ou digite:' : 'Seu Nome ou Família:'} <span className="text-[#C2847A]">*</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  placeholder="Ex: Tio Paulo e Família"
-                  className="w-full px-4 py-3 rounded-xl bg-[#FDFBF7] border border-[#E8DCD5] text-sm focus:outline-none focus:border-[#C2847A]"
-                />
+                <div className="relative">
+                  {method === 'in_person' && (
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8D7B75]" />
+                  )}
+                  <input
+                    type="text"
+                    required
+                    value={guestName}
+                    onFocus={() => setShowSuggestions(true)}
+                    onChange={(e) => {
+                      setGuestName(e.target.value);
+                      setShowSuggestions(true);
+                    }}
+                    placeholder={method === 'in_person' ? "Comece digitando seu nome..." : "Ex: Tio Paulo e Família"}
+                    className={`w-full py-3 rounded-xl bg-[#FDFBF7] border border-[#E8DCD5] text-sm focus:outline-none focus:border-[#C2847A] ${
+                      method === 'in_person' ? 'pl-10 pr-4' : 'px-4'
+                    }`}
+                  />
+                </div>
+
+                {/* Suggestions dropdown */}
+                {method === 'in_person' && showSuggestions && filteredGuestSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-[#EADBCE] rounded-2xl shadow-xl overflow-hidden divide-y divide-gray-100">
+                    <div className="px-3 py-1.5 bg-[#FAF3EE] text-[10px] uppercase font-bold text-[#8D7B75]">
+                      Convidados encontrados na lista:
+                    </div>
+                    {filteredGuestSuggestions.map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => handleSelectSuggestedGuest(g)}
+                        className="w-full px-4 py-2.5 text-left hover:bg-[#FAF3EE] flex items-center justify-between text-xs transition-colors"
+                      >
+                        <span className="font-semibold text-[#2D2422]">{g.name}</span>
+                        <span className="text-[11px] text-[#C2847A] font-medium">Selecionar</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Phone (useful for in_person delivery) */}
               {method === 'in_person' && (
                 <div className="space-y-1.5 animate-in fade-in duration-200">
                   <label className="block text-xs uppercase tracking-wider text-[#8D7B75] font-semibold">
-                    Seu Telefone / WhatsApp (opcional):
+                    Seu Telefone / WhatsApp (para contato):
                   </label>
                   <input
                     type="tel"
                     value={guestPhone}
                     onChange={(e) => setGuestPhone(e.target.value)}
-                    placeholder="Ex: (32) 99999-9999"
+                    placeholder="Ex: (11) 99999-9999"
                     className="w-full px-4 py-3 rounded-xl bg-[#FDFBF7] border border-[#E8DCD5] text-sm focus:outline-none focus:border-[#C2847A]"
                   />
                 </div>
@@ -302,7 +359,7 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
               {/* Message to couple */}
               <div className="space-y-1.5">
                 <label className="block text-xs uppercase tracking-wider text-[#8D7B75] font-semibold">
-                  Mensagem de carinho para os noivos:
+                  Mensagem de carinho para os noivos (opcional):
                 </label>
                 <textarea
                   rows={3}
@@ -317,12 +374,12 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
               <button
                 type="submit"
                 disabled={isGenerating || !guestName.trim()}
-                className="w-full py-3.5 rounded-2xl bg-[#C2847A] text-white font-medium text-sm sm:text-base hover:bg-[#B07065] shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3.5 rounded-2xl bg-[#C2847A] text-white font-medium text-sm sm:text-base hover:bg-[#B07065] shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {method === 'in_person' ? (
                   <>
                     <PackageCheck className="w-5 h-5" />
-                    <span>Confirmar que vou levar pessoalmente</span>
+                    <span>Avançar para Confirmação de Entrega</span>
                   </>
                 ) : (
                   <>
@@ -332,6 +389,57 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
                 )}
               </button>
             </form>
+          )}
+
+          {/* STEP: Double Confirmation for In-Person Delivery */}
+          {step === 'in_person_confirm' && (
+            <div className="space-y-5 animate-in zoom-in-95 duration-200">
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-amber-800">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Dupla Confirmação de Reserva</span>
+                </div>
+                <p className="text-xs leading-relaxed text-amber-900">
+                  Ao confirmar, este presente será <strong>imediatamente bloqueado e ocultado do site</strong> para que nenhum outro convidado escolha ou compre o mesmo item repetido.
+                </p>
+              </div>
+
+              {/* Summary Card */}
+              <div className="p-4 rounded-2xl bg-[#FDFBF7] border border-[#EADBCE] space-y-3">
+                <div className="flex items-center gap-3">
+                  <img src={gift.imageUrl} alt={gift.title} className="w-14 h-14 rounded-xl object-cover" />
+                  <div>
+                    <h4 className="font-semibold text-sm text-[#2D2422]">{gift.title}</h4>
+                    <p className="text-xs text-[#C2847A] font-bold">{formatCurrency(finalAmount)}</p>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-[#EADBCE] text-xs text-[#6B5A55] space-y-1">
+                  <p><strong>Quem vai levar:</strong> {guestName}</p>
+                  {guestPhone && <p><strong>Telefone / WhatsApp:</strong> {guestPhone}</p>}
+                  <p><strong>Modalidade:</strong> Entrega física pessoalmente no dia do casamento</p>
+                </div>
+              </div>
+
+              <div className="space-y-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={handleConfirmInPersonReservation}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-sm shadow-md hover:shadow-lg hover:from-emerald-700 hover:to-teal-700 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <PackageCheck className="w-5 h-5" />
+                  <span>Sim, confirmo que vou comprar e levar este presente!</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStep('form')}
+                  className="w-full py-2.5 rounded-xl bg-white border border-[#E8DCD5] text-[#6B5A55] text-xs font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Voltar / Cancelar
+                </button>
+              </div>
+            </div>
           )}
 
           {step === 'pix' && (

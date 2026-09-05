@@ -59,8 +59,8 @@ export class WeddingService {
       const settingsDoc = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'main_settings'));
       if (settingsDoc.exists()) {
         const cloudSettings = settingsDoc.data() as WeddingSettings;
-        if (!cloudSettings.sectionOrder || cloudSettings.sectionOrder[cloudSettings.sectionOrder.length - 1] !== 'fotos' || cloudSettings.sectionOrder.indexOf('rsvp') > 3) {
-          cloudSettings.sectionOrder = ['historia', 'local', 'rsvp', 'orientacoes', 'presentes', 'duvidas', 'fotos'];
+        if (!cloudSettings.sectionOrder || !Array.isArray(cloudSettings.sectionOrder) || cloudSettings.sectionOrder.length === 0) {
+          cloudSettings.sectionOrder = ['historia', 'local', 'orientacoes', 'presentes', 'duvidas', 'rsvp', 'fotos'];
         }
         setLocalItem(STORAGE_KEYS.SETTINGS, cloudSettings);
       }

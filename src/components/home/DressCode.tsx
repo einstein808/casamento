@@ -31,10 +31,10 @@ export function DressCode({ settings }: DressCodeProps) {
             Informações Importantes
           </div>
           <h2 className="font-serif text-3xl sm:text-5xl font-normal text-[#2D2422]">
-            Orientações aos Convidados
+            {settings.dressCodeTitle || 'Orientações aos Convidados'}
           </h2>
-          <p className="text-sm sm:text-base text-[#8D7B75] max-w-xl mx-auto font-light">
-            Dicas essenciais e checklist completo para você aproveitar cada segundo desse grande dia com a gente!
+          <p className="text-sm sm:text-base text-[#8D7B75] max-w-2xl mx-auto font-light leading-relaxed">
+            {settings.dressCodeDescription || 'Dicas essenciais e checklist completo para você aproveitar cada segundo desse grande dia com a gente!'}
           </p>
           <div className="w-24 h-0.5 bg-[#C2847A]/40 mx-auto mt-4 rounded-full" />
         </motion.div>

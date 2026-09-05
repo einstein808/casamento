@@ -56,7 +56,7 @@ export default function HomePage() {
     );
   }
 
-  const defaultOrder: SectionId[] = ['historia', 'local', 'rsvp', 'orientacoes', 'presentes', 'duvidas', 'fotos'];
+  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'presentes', 'duvidas', 'rsvp', 'fotos'];
   const activeOrder = settings.sectionOrder && settings.sectionOrder.length > 0 ? settings.sectionOrder : defaultOrder;
 
   const renderSection = (id: SectionId) => {

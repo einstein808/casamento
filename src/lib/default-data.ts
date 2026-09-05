@@ -69,6 +69,7 @@ export const DEFAULT_SETTINGS: WeddingSettings = {
   // Admin & Features
   adminPin: '1234',
   postEventPhotosEnabled: true,
+  sectionOrder: ['historia', 'local', 'orientacoes', 'presentes', 'duvidas', 'rsvp', 'fotos'],
 };
 
 export const DEFAULT_GIFTS: Gift[] = [

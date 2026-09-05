@@ -1101,7 +1101,7 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    const defaultOrder: SectionId[] = ['historia', 'local', 'rsvp', 'orientacoes', 'presentes', 'duvidas', 'fotos'];
+                    const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'presentes', 'duvidas', 'rsvp', 'fotos'];
                     const updated = { ...settings, sectionOrder: defaultOrder };
                     setSettings(updated);
                     WeddingService.saveSettings(updated);
@@ -1114,7 +1114,7 @@ export default function AdminDashboardPage() {
 
               <div className="space-y-2.5 pt-2">
                 {(() => {
-                  const defaultOrder: SectionId[] = ['historia', 'local', 'rsvp', 'orientacoes', 'presentes', 'duvidas', 'fotos'];
+                  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'presentes', 'duvidas', 'rsvp', 'fotos'];
                   const order = settings.sectionOrder && settings.sectionOrder.length > 0 ? settings.sectionOrder : defaultOrder;
 
                   const sectionMeta: Record<SectionId, { title: string; desc: string; tag: string }> = {

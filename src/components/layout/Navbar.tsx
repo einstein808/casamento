@@ -41,7 +41,7 @@ export function Navbar({
     duvidas: { name: 'Dúvidas (FAQ)', href: '#duvidas', visible: true },
   };
 
-  const defaultOrder: SectionId[] = ['historia', 'local', 'rsvp', 'orientacoes', 'presentes', 'duvidas', 'fotos'];
+  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'presentes', 'duvidas', 'rsvp', 'fotos'];
   const activeOrder = sectionOrder && sectionOrder.length > 0 ? sectionOrder : defaultOrder;
 
   const navLinks = [
