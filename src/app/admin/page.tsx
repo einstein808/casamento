@@ -1056,7 +1056,7 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos'];
+                    const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos', 'duvidas'];
                     const updated = { ...settings, sectionOrder: defaultOrder };
                     setSettings(updated);
                     WeddingService.saveSettings(updated);
@@ -1069,7 +1069,7 @@ export default function AdminDashboardPage() {
 
               <div className="space-y-2.5 pt-2">
                 {(() => {
-                  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos'];
+                  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos', 'duvidas'];
                   const order = settings.sectionOrder && settings.sectionOrder.length > 0 ? settings.sectionOrder : defaultOrder;
 
                   const sectionMeta: Record<SectionId, { title: string; desc: string; tag: string }> = {
@@ -1102,6 +1102,11 @@ export default function AdminDashboardPage() {
                       title: 'Mural de Fotos dos Convidados',
                       desc: 'Galeria colaborativa com upload de fotos ao vivo',
                       tag: '#fotos',
+                    },
+                    duvidas: {
+                      title: 'Perguntas Frequentes & Dúvidas (FAQ)',
+                      desc: 'Tire dúvidas sobre estacionamento, trajes e cardápio',
+                      tag: '#duvidas',
                     },
                   };
 
@@ -2344,6 +2349,29 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
+                  {gift.reservedInPerson && (
+                    <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold flex items-center gap-1 text-amber-800">
+                          🎁 Entrega Presencial
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            WeddingService.clearGiftReservation(gift.id);
+                            reloadAll();
+                          }}
+                          className="text-[10px] text-red-600 hover:underline font-semibold"
+                        >
+                          Liberar
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-amber-800">
+                        Por: <strong>{gift.reservedByGuestName || 'Convidado'}</strong>
+                      </p>
+                    </div>
+                  )}
+
                   <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
                     <span className="text-sm font-bold text-[#2D2422]">
                       {formatCurrency(gift.price)}
@@ -2368,8 +2396,9 @@ export default function AdminDashboardPage() {
                     <tr>
                       <th className="py-3 px-4">Data</th>
                       <th className="py-3 px-4">Convidado</th>
+                      <th className="py-3 px-4">Modalidade</th>
                       <th className="py-3 px-4">Presente Escolhido</th>
-                      <th className="py-3 px-4">Valor PIX</th>
+                      <th className="py-3 px-4">Valor Estimado</th>
                       <th className="py-3 px-4">Mensagem de Carinho</th>
                       <th className="py-3 px-4">Status</th>
                     </tr>
@@ -2378,13 +2407,27 @@ export default function AdminDashboardPage() {
                     {pixLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-[#FAF3EE]/30">
                         <td className="py-3 px-4 text-[#8D7B75]">{new Date(log.createdAt).toLocaleDateString('pt-BR')}</td>
-                        <td className="py-3 px-4 font-bold">{log.guestName}</td>
+                        <td className="py-3 px-4 font-bold">
+                          {log.guestName}
+                          {log.guestPhone && <span className="block text-[10px] text-gray-500 font-normal">{log.guestPhone}</span>}
+                        </td>
+                        <td className="py-3 px-4">
+                          {log.paymentMethod === 'in_person' ? (
+                            <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold">
+                              🎁 Entrega no Dia
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                              ⚡ PIX
+                            </span>
+                          )}
+                        </td>
                         <td className="py-3 px-4 text-[#C2847A] font-medium">{log.giftTitle}</td>
-                        <td className="py-3 px-4 font-bold text-emerald-700">{formatCurrency(log.amount)}</td>
+                        <td className="py-3 px-4 font-bold text-[#2D2422]">{formatCurrency(log.amount)}</td>
                         <td className="py-3 px-4 max-w-xs italic text-[#6B5A55]">{log.message || '-'}</td>
                         <td className="py-3 px-4">
                           <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                            Recebido
+                            Confirmado
                           </span>
                         </td>
                       </tr>

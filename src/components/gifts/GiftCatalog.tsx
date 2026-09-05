@@ -7,7 +7,9 @@ import {
   Sparkles, 
   Heart, 
   Search, 
-  DollarSign
+  DollarSign,
+  Lock,
+  PackageCheck
 } from 'lucide-react';
 import { Gift, WeddingSettings } from '@/lib/types';
 import { WeddingService } from '@/lib/wedding-service';
@@ -30,6 +32,9 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
 
   useEffect(() => {
     loadGifts();
+    WeddingService.syncAllFromCloud().then(() => {
+      loadGifts();
+    });
   }, []);
 
   const categories: { id: string; label: string }[] = [
@@ -168,6 +173,13 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
                   <span className="absolute top-3 right-3 px-3 py-1 rounded-full bg-white/95 backdrop-blur-md text-[#2D2422] font-bold text-xs shadow-sm">
                     {formatCurrency(gift.price)}
                   </span>
+
+                  {gift.reservedInPerson && (
+                    <span className="absolute bottom-3 left-3 right-3 px-2.5 py-1 rounded-xl bg-amber-500/95 backdrop-blur-md text-white font-semibold text-[10px] sm:text-xs flex items-center justify-center gap-1 shadow-md">
+                      <PackageCheck className="w-3.5 h-3.5" />
+                      <span>Entrega física já reservada</span>
+                    </span>
+                  )}
                 </div>
 
                 {/* Content */}
@@ -193,7 +205,9 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
                       className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-[#C2847A] to-rose-500 text-white font-bold text-xs hover:shadow-lg hover:shadow-amber-500/25 transition-all flex items-center justify-center gap-2 shadow-xs"
                     >
                       <Heart className="w-4 h-4 fill-white" />
-                      <span>Presentear via PIX</span>
+                      <span>
+                        {gift.reservedInPerson ? 'Presentear via PIX' : 'Presentear (PIX / Presencial)'}
+                      </span>
                     </motion.button>
                   </div>
                 </div>
@@ -238,7 +252,10 @@ export function GiftCatalog({ settings }: GiftCatalogProps) {
         settings={settings}
         isOpen={Boolean(activeGiftModal)}
         onClose={() => setActiveGiftModal(null)}
-        onSuccess={loadGifts}
+        onSuccess={() => {
+          setActiveGiftModal(null);
+          loadGifts();
+        }}
       />
     </section>
   );

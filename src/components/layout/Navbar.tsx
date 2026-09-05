@@ -36,9 +36,10 @@ export function Navbar({
     rsvp: { name: 'Presença (RSVP)', href: '#rsvp', visible: true },
     presentes: { name: 'Lista de Presentes', href: '#presentes', visible: true },
     fotos: { name: 'Mural de Fotos', href: '#fotos', visible: true },
+    duvidas: { name: 'Dúvidas (FAQ)', href: '#duvidas', visible: true },
   };
 
-  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos'];
+  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos', 'duvidas'];
   const activeOrder = sectionOrder && sectionOrder.length > 0 ? sectionOrder : defaultOrder;
 
   const navLinks = [

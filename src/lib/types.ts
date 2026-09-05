@@ -27,7 +27,7 @@ export interface Guest {
 }
 
 export type GiftCategory = 'casa' | 'cozinha' | 'lua-de-mel' | 'experiencias' | 'brincadeiras';
-export type SectionId = 'historia' | 'local' | 'orientacoes' | 'rsvp' | 'presentes' | 'fotos';
+export type SectionId = 'historia' | 'local' | 'orientacoes' | 'rsvp' | 'presentes' | 'fotos' | 'duvidas';
 
 export interface GuestChecklistItem {
   id: string;
@@ -48,6 +48,9 @@ export interface Gift {
   quotaPurchased?: number;
   isFeatured?: boolean;
   active: boolean;
+  reservedInPerson?: boolean;
+  reservedByGuestName?: string;
+  reservedAt?: string;
 }
 
 export interface PixContribution {
@@ -61,6 +64,7 @@ export interface PixContribution {
   message?: string;
   pixCode?: string;
   status: 'pending' | 'confirmed';
+  paymentMethod?: 'pix' | 'in_person';
   createdAt: string;
 }
 

@@ -9,8 +9,9 @@ import { DressCode } from '@/components/home/DressCode';
 import { RSVPSection } from '@/components/rsvp/RSVPSection';
 import { GiftCatalog } from '@/components/gifts/GiftCatalog';
 import { GuestGallery } from '@/components/gallery/GuestGallery';
+import { FAQSection } from '@/components/home/FAQSection';
+import { BottomActionCTA } from '@/components/layout/BottomActionCTA';
 import { Footer } from '@/components/layout/Footer';
-import { FloatingStickyBar } from '@/components/layout/FloatingStickyBar';
 import { ThemeInjector } from '@/components/layout/ThemeInjector';
 import { WeddingSettings, SectionId } from '@/lib/types';
 import { WeddingService } from '@/lib/wedding-service';
@@ -19,7 +20,13 @@ export default function HomePage() {
   const [settings, setSettings] = useState<WeddingSettings | null>(null);
 
   useEffect(() => {
+    // Initial local read
     setSettings(WeddingService.getSettings());
+
+    // Sync from Firebase Firestore and update
+    WeddingService.syncAllFromCloud().then(() => {
+      setSettings(WeddingService.getSettings());
+    });
   }, []);
 
   if (!settings) {
@@ -33,7 +40,7 @@ export default function HomePage() {
     );
   }
 
-  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos'];
+  const defaultOrder: SectionId[] = ['historia', 'local', 'orientacoes', 'rsvp', 'presentes', 'fotos', 'duvidas'];
   const activeOrder = settings.sectionOrder && settings.sectionOrder.length > 0 ? settings.sectionOrder : defaultOrder;
 
   const renderSection = (id: SectionId) => {
@@ -57,6 +64,8 @@ export default function HomePage() {
         return <GiftCatalog key="presentes" settings={settings} />;
       case 'fotos':
         return <GuestGallery key="fotos" />;
+      case 'duvidas':
+        return <FAQSection key="duvidas" settings={settings} />;
       default:
         return null;
     }
@@ -75,8 +84,10 @@ export default function HomePage() {
       {/* Dynamic Ordered Sections */}
       {activeOrder.map((sectionId) => renderSection(sectionId))}
 
+      {/* Prominent Bottom Action Call-To-Action Banner */}
+      <BottomActionCTA settings={settings} />
+
       <Footer settings={settings} />
-      <FloatingStickyBar settings={settings} />
     </main>
   );
 }

@@ -2,10 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { 
-  HelpCircle, 
-  Sparkles
-} from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { WeddingSettings } from '@/lib/types';
 import { getChecklistIconComponent, DEFAULT_CHECKLIST_ITEMS } from '@/lib/checklist-icons';
 
@@ -17,23 +14,6 @@ export function DressCode({ settings }: DressCodeProps) {
   const activeChecklist = settings.checklistItems && settings.checklistItems.length > 0 
     ? settings.checklistItems 
     : DEFAULT_CHECKLIST_ITEMS;
-
-  const defaultFaqs = [
-    {
-      q: 'Posso levar acompanhante que não está no meu convite?',
-      a: 'Nosso espaço e buffet têm capacidade estritamente limitada para os convidados listados. Pedimos que respeitem a quantidade de pessoas indicada no seu link de confirmação.',
-    },
-    {
-      q: 'Tem estacionamento no local?',
-      a: 'Sim! Ambos os locais contam com serviço de valet e estacionamento privativo gratuito para os nossos convidados.',
-    },
-    {
-      q: 'Haverá opções vegetarianas / sem glúten no menu?',
-      a: 'Com certeza! No momento da confirmação de presença (RSVP), você pode informar qualquer restrição alimentar que nossa equipe do buffet providenciará.',
-    },
-  ];
-
-  const activeFaqs = settings.faqs !== undefined ? settings.faqs : defaultFaqs;
 
   return (
     <section id="orientacoes" className="scroll-mt-24 py-20 sm:py-28 bg-[#FDFBF7] relative">
@@ -127,41 +107,6 @@ export function DressCode({ settings }: DressCodeProps) {
                   </motion.div>
                 );
               })}
-            </div>
-          </div>
-        )}
-
-        {/* FAQs with Motion */}
-        {activeFaqs.length > 0 && (
-          <div className="space-y-4 max-w-3xl mx-auto">
-            <h3 className="font-serif text-xl sm:text-2xl font-medium text-center text-[#2D2422] mb-6">
-              Perguntas Frequentes & Dúvidas
-            </h3>
-
-            <div className="grid grid-cols-1 gap-4">
-              {activeFaqs.map((faq, i) => (
-                <motion.div 
-                  key={i} 
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-40px' }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
-                  whileHover={{ y: -2 }}
-                  className="bg-white rounded-2xl p-6 border border-[#F0E6DF] shadow-xs"
-                >
-                  <div className="flex items-start gap-3">
-                    <HelpCircle className="w-5 h-5 text-[#C2847A] shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-[#2D2422] text-sm sm:text-base mb-1.5">
-                        {faq.q}
-                      </h4>
-                      <p className="text-xs sm:text-sm text-[#6B5A55] leading-relaxed">
-                        {faq.a}
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
             </div>
           </div>
         )}

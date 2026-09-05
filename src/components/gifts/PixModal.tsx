@@ -10,7 +10,10 @@ import {
   PartyPopper, 
   ShieldCheck, 
   Smartphone, 
-  Sparkles 
+  Sparkles,
+  Gift as GiftIcon,
+  Lock,
+  PackageCheck
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Gift, WeddingSettings } from '@/lib/types';
@@ -28,7 +31,9 @@ interface PixModalProps {
 
 export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModalProps) {
   const [step, setStep] = useState<'form' | 'pix' | 'success'>('form');
+  const [method, setMethod] = useState<'pix' | 'in_person'>('pix');
   const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
   const [guestMessage, setGuestMessage] = useState('');
   const [customAmount, setCustomAmount] = useState<number>(0);
   
@@ -36,13 +41,17 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setStep('form');
+      setMethod('pix');
       setGuestName('');
+      setGuestPhone('');
       setGuestMessage('');
       setCopied(false);
+      setErrorMsg('');
       setCustomAmount(gift?.price || 100);
     }
   }, [isOpen, gift]);
@@ -50,15 +59,44 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
   if (!isOpen || !gift) return null;
 
   const finalAmount = gift.price > 0 ? gift.price : (customAmount || 100);
+  const isPhysicalAlreadyReserved = Boolean(gift.reservedInPerson);
 
   const handleGeneratePix = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!guestName.trim()) return;
 
-    setIsGenerating(true);
+    if (method === 'in_person') {
+      if (isPhysicalAlreadyReserved) {
+        setErrorMsg('Este presente já foi reservado para entrega física por outro convidado!');
+        return;
+      }
 
+      const res = WeddingService.reserveGiftInPerson(
+        gift.id, 
+        guestName.trim(), 
+        guestPhone.trim(), 
+        guestMessage.trim()
+      );
+
+      if (!res.success) {
+        setErrorMsg(res.error || 'Não foi possível reservar este item.');
+        return;
+      }
+
+      setStep('success');
+      confetti({
+        particleCount: 150,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ['#c2847a', '#d9c5b2', '#e0a899', '#fdfbf7', '#2e4057'],
+      });
+      onSuccess();
+      return;
+    }
+
+    // PIX flow
+    setIsGenerating(true);
     try {
-      // Generate PIX EMV Code
       const payload = generatePixPayload({
         pixKey: settings.pixKey,
         merchantName: settings.pixMerchantName || `${settings.brideName} e ${settings.groomName}`,
@@ -68,11 +106,8 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
       });
 
       setPixPayload(payload);
-
-      // Generate QR Code image
       const qrDataUrl = await generatePixQrCode(payload);
       setQrCodeUrl(qrDataUrl);
-
       setStep('pix');
     } catch (err) {
       console.error('Erro ao gerar PIX:', err);
@@ -88,15 +123,16 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
   };
 
   const handleConfirmSent = () => {
-    // Record contribution
     WeddingService.recordPixContribution({
       giftId: gift.id,
       giftTitle: gift.title,
       guestName: guestName.trim(),
+      guestPhone: guestPhone.trim(),
       amount: finalAmount,
       message: guestMessage.trim(),
       pixCode: pixPayload,
       status: 'confirmed',
+      paymentMethod: 'pix',
     });
 
     setStep('success');
@@ -112,18 +148,18 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-[#F0E6DF] overflow-hidden">
+      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-[#F0E6DF] overflow-hidden max-h-[92vh] flex flex-col">
         {/* Modal Header */}
-        <div className="p-6 bg-gradient-to-r from-[#FAF3EE] to-[#FDFBF7] border-b border-[#EADBCE] flex items-center justify-between">
+        <div className="p-5 sm:p-6 bg-gradient-to-r from-[#FAF3EE] to-[#FDFBF7] border-b border-[#EADBCE] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-[#C2847A]/10 text-[#C2847A] flex items-center justify-center font-bold">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-serif text-xl font-medium text-[#2D2422]">
+              <h3 className="font-serif text-lg sm:text-xl font-medium text-[#2D2422]">
                 Presentear os Noivos
               </h3>
-              <p className="text-xs text-[#8D7B75]">
+              <p className="text-xs text-[#8D7B75] line-clamp-1">
                 {gift.title} • {formatCurrency(finalAmount)}
               </p>
             </div>
@@ -138,7 +174,7 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 sm:p-8">
+        <div className="p-6 sm:p-8 overflow-y-auto flex-1">
           {step === 'form' && (
             <form onSubmit={handleGeneratePix} className="space-y-5">
               {/* Product preview card */}
@@ -157,6 +193,81 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
                 </div>
               </div>
 
+              {/* Selector: PIX vs Entregar Pessoalmente */}
+              <div className="space-y-2">
+                <label className="block text-xs uppercase tracking-wider text-[#8D7B75] font-semibold">
+                  Como você deseja presentear?
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setMethod('pix'); setErrorMsg(''); }}
+                    className={`p-3 rounded-2xl border text-left flex flex-col gap-1 transition-all ${
+                      method === 'pix'
+                        ? 'border-[#C2847A] bg-[#FAF3EE] shadow-xs'
+                        : 'border-[#E8DCD5] bg-white hover:border-[#C2847A]/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#2D2422] flex items-center gap-1">
+                        <QrCode className="w-3.5 h-3.5 text-[#C2847A]" />
+                        Via PIX
+                      </span>
+                      {method === 'pix' && <Check className="w-3.5 h-3.5 text-[#C2847A]" />}
+                    </div>
+                    <p className="text-[11px] text-[#8D7B75]">
+                      Rápido e prático pelo QR Code / Copia e Cola
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isPhysicalAlreadyReserved}
+                    onClick={() => {
+                      if (!isPhysicalAlreadyReserved) {
+                        setMethod('in_person');
+                        setErrorMsg('');
+                      }
+                    }}
+                    className={`p-3 rounded-2xl border text-left flex flex-col gap-1 transition-all relative ${
+                      isPhysicalAlreadyReserved
+                        ? 'opacity-50 bg-gray-50 border-gray-200 cursor-not-allowed'
+                        : method === 'in_person'
+                        ? 'border-[#C2847A] bg-[#FAF3EE] shadow-xs'
+                        : 'border-[#E8DCD5] bg-white hover:border-[#C2847A]/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#2D2422] flex items-center gap-1">
+                        <GiftIcon className="w-3.5 h-3.5 text-[#C2847A]" />
+                        Entregar no Dia
+                      </span>
+                      {isPhysicalAlreadyReserved ? (
+                        <Lock className="w-3.5 h-3.5 text-gray-400" />
+                      ) : method === 'in_person' ? (
+                        <Check className="w-3.5 h-3.5 text-[#C2847A]" />
+                      ) : null}
+                    </div>
+                    <p className="text-[11px] text-[#8D7B75]">
+                      {isPhysicalAlreadyReserved ? 'Já reservado por outro convidado' : 'Comprar e levar pessoalmente na festa'}
+                    </p>
+                  </button>
+                </div>
+
+                {isPhysicalAlreadyReserved && (
+                  <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-center gap-2">
+                    <Lock className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                    <span>
+                      A entrega física deste item já foi reservada por <strong>{gift.reservedByGuestName || 'um convidado'}</strong>. Você pode presentear via PIX!
+                    </span>
+                  </div>
+                )}
+
+                {errorMsg && (
+                  <p className="text-xs text-red-500 font-medium">{errorMsg}</p>
+                )}
+              </div>
+
               {/* Guest name */}
               <div className="space-y-1.5">
                 <label className="block text-xs uppercase tracking-wider text-[#8D7B75] font-semibold">
@@ -171,6 +282,22 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
                   className="w-full px-4 py-3 rounded-xl bg-[#FDFBF7] border border-[#E8DCD5] text-sm focus:outline-none focus:border-[#C2847A]"
                 />
               </div>
+
+              {/* Phone (useful for in_person delivery) */}
+              {method === 'in_person' && (
+                <div className="space-y-1.5 animate-in fade-in duration-200">
+                  <label className="block text-xs uppercase tracking-wider text-[#8D7B75] font-semibold">
+                    Seu Telefone / WhatsApp (opcional):
+                  </label>
+                  <input
+                    type="tel"
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                    placeholder="Ex: (32) 99999-9999"
+                    className="w-full px-4 py-3 rounded-xl bg-[#FDFBF7] border border-[#E8DCD5] text-sm focus:outline-none focus:border-[#C2847A]"
+                  />
+                </div>
+              )}
 
               {/* Message to couple */}
               <div className="space-y-1.5">
@@ -192,8 +319,17 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
                 disabled={isGenerating || !guestName.trim()}
                 className="w-full py-3.5 rounded-2xl bg-[#C2847A] text-white font-medium text-sm sm:text-base hover:bg-[#B07065] shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                <QrCode className="w-5 h-5" />
-                <span>{isGenerating ? 'Gerando PIX...' : 'Avançar para Pagamento PIX'}</span>
+                {method === 'in_person' ? (
+                  <>
+                    <PackageCheck className="w-5 h-5" />
+                    <span>Confirmar que vou levar pessoalmente</span>
+                  </>
+                ) : (
+                  <>
+                    <QrCode className="w-5 h-5" />
+                    <span>{isGenerating ? 'Gerando PIX...' : 'Avançar para Pagamento PIX'}</span>
+                  </>
+                )}
               </button>
             </form>
           )}
@@ -251,56 +387,71 @@ export function PixModal({ gift, settings, isOpen, onClose, onSuccess }: PixModa
                     ) : (
                       <>
                         <Copy className="w-3.5 h-3.5" />
-                        <span>Copiar</span>
+                        <span>Copiar Código</span>
                       </>
                     )}
                   </button>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="space-y-2 pt-2">
+              <div className="pt-2 flex flex-col gap-2">
                 <button
                   type="button"
                   onClick={handleConfirmSent}
-                  className="w-full py-3.5 rounded-2xl bg-[#C2847A] text-white font-medium text-sm sm:text-base hover:bg-[#B07065] shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
+                  className="w-full py-3.5 rounded-2xl bg-[#C2847A] text-white font-medium text-sm sm:text-base hover:bg-[#B07065] shadow-md transition-all flex items-center justify-center gap-2"
                 >
                   <Check className="w-5 h-5" />
-                  <span>Já realizei o PIX no banco</span>
+                  <span>Já fiz a transferência no banco</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setStep('form')}
-                  className="text-xs text-[#8D7B75] hover:underline"
+                  className="text-xs text-[#8D7B75] hover:text-[#2D2422] py-1"
                 >
-                  Voltar e editar mensagem
+                  Voltar para alterar dados
                 </button>
               </div>
             </div>
           )}
 
           {step === 'success' && (
-            <div className="text-center py-6 space-y-6 animate-in zoom-in-95 duration-300">
-              <div className="inline-flex p-4 rounded-full bg-[#FAF3EE] text-[#C2847A]">
-                <PartyPopper className="w-12 h-12 animate-bounce" />
+            <div className="text-center py-6 space-y-5 animate-in zoom-in-95 duration-300">
+              <div className="w-16 h-16 rounded-full bg-[#FAF3EE] text-[#C2847A] flex items-center justify-center mx-auto border-2 border-[#EADBCE]">
+                <PartyPopper className="w-8 h-8 animate-bounce" />
               </div>
 
               <div className="space-y-2">
                 <h3 className="font-serif text-2xl sm:text-3xl font-medium text-[#2D2422]">
-                  Muito Obrigado! ❤️
+                  {method === 'in_person' ? 'Presente Reservado com Sucesso!' : 'Muito Obrigado pelo Carinho!'}
                 </h3>
-                <p className="text-sm text-[#6B5A55] max-w-sm mx-auto">
-                  {guestName}, seu presente ({gift.title}) e sua mensagem foram registrados com muito amor no nosso coração!
+                <p className="text-sm text-[#6B5A55] max-w-sm mx-auto leading-relaxed">
+                  {method === 'in_person' ? (
+                    <>
+                      <strong>{guestName}</strong>, sua intenção de entregar o item <strong>{gift.title}</strong> pessoalmente foi confirmada. Os noivos agradecem de coração!
+                    </>
+                  ) : (
+                    <>
+                      <strong>{guestName}</strong>, sua contribuição e seus votos foram registrados com muito amor no coração dos noivos!
+                    </>
+                  )}
                 </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#FAF3EE]/60 border border-[#EADBCE] text-xs text-[#8D7B75] space-y-1">
+                <div className="flex items-center justify-center gap-1.5 font-semibold text-[#2D2422]">
+                  <Heart className="w-4 h-4 text-[#C2847A] fill-[#C2847A]" />
+                  <span>{settings.brideName} & {settings.groomName}</span>
+                </div>
+                <p>Agradecem imensamente por fazer parte dessa história.</p>
               </div>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="px-8 py-3 rounded-full bg-[#C2847A] text-white font-medium text-sm hover:bg-[#B07065] shadow-sm transition-all"
+                className="w-full py-3.5 rounded-2xl bg-[#2D2422] text-white font-medium text-sm hover:bg-black transition-colors"
               >
-                Fechar e voltar ao site
+                Concluir e Voltar
               </button>
             </div>
           )}

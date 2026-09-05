@@ -12,6 +12,15 @@ import {
   PixContribution, 
   WeddingSettings 
 } from './types';
+import { db, COLLECTIONS } from './firebase';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  getDocs, 
+  collection, 
+  deleteDoc 
+} from 'firebase/firestore';
 
 const STORAGE_KEYS = {
   SETTINGS: 'casamento_settings_v1',
@@ -41,6 +50,79 @@ function setLocalItem<T>(key: string, value: T): void {
 }
 
 export class WeddingService {
+  // --- CLOUD SYNC (Firebase Firestore) ---
+  static async syncAllFromCloud(): Promise<boolean> {
+    if (!db || typeof window === 'undefined') return false;
+    try {
+      // 1. Sync Settings
+      const settingsDoc = await getDoc(doc(db, COLLECTIONS.SETTINGS, 'main_settings'));
+      if (settingsDoc.exists()) {
+        const cloudSettings = settingsDoc.data() as WeddingSettings;
+        setLocalItem(STORAGE_KEYS.SETTINGS, cloudSettings);
+      } else {
+        // Se ainda não existir no Firestore, salva os dados padrão
+        const current = this.getSettings();
+        setDoc(doc(db, COLLECTIONS.SETTINGS, 'main_settings'), current).catch(console.warn);
+      }
+
+      // 2. Sync Guests
+      const guestsSnap = await getDocs(collection(db, COLLECTIONS.GUESTS));
+      if (!guestsSnap.empty) {
+        const cloudGuests: Guest[] = [];
+        guestsSnap.forEach(d => cloudGuests.push(d.data() as Guest));
+        if (cloudGuests.length > 0) {
+          setLocalItem(STORAGE_KEYS.GUESTS, cloudGuests);
+        }
+      } else {
+        // Inicializa convidados padrão no Firestore se vazio
+        const currentGuests = this.getGuests();
+        currentGuests.forEach(g => {
+          setDoc(doc(db!, COLLECTIONS.GUESTS, g.id), g).catch(console.warn);
+        });
+      }
+
+      // 3. Sync Gifts
+      const giftsSnap = await getDocs(collection(db, COLLECTIONS.GIFTS));
+      if (!giftsSnap.empty) {
+        const cloudGifts: Gift[] = [];
+        giftsSnap.forEach(d => cloudGifts.push(d.data() as Gift));
+        if (cloudGifts.length > 0) {
+          setLocalItem(STORAGE_KEYS.GIFTS, cloudGifts);
+        }
+      } else {
+        const currentGifts = this.getGifts();
+        currentGifts.forEach(g => {
+          setDoc(doc(db!, COLLECTIONS.GIFTS, g.id), g).catch(console.warn);
+        });
+      }
+
+      // 4. Sync Pix / Contributions
+      const pixSnap = await getDocs(collection(db, COLLECTIONS.PIX_CONTRIBUTIONS));
+      if (!pixSnap.empty) {
+        const cloudPix: PixContribution[] = [];
+        pixSnap.forEach(d => cloudPix.push(d.data() as PixContribution));
+        if (cloudPix.length > 0) {
+          setLocalItem(STORAGE_KEYS.PIX_LOGS, cloudPix);
+        }
+      }
+
+      // 5. Sync Photos
+      const photosSnap = await getDocs(collection(db, COLLECTIONS.PHOTOS));
+      if (!photosSnap.empty) {
+        const cloudPhotos: GuestPhoto[] = [];
+        photosSnap.forEach(d => cloudPhotos.push(d.data() as GuestPhoto));
+        if (cloudPhotos.length > 0) {
+          setLocalItem(STORAGE_KEYS.PHOTOS, cloudPhotos);
+        }
+      }
+
+      return true;
+    } catch (err) {
+      console.warn('Erro ao sincronizar com Firestore:', err);
+      return false;
+    }
+  }
+
   // --- SETTINGS ---
   static getSettings(): WeddingSettings {
     const s = getLocalItem<WeddingSettings>(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
@@ -65,7 +147,7 @@ export class WeddingService {
     }
 
     if (changed) {
-      setLocalItem(STORAGE_KEYS.SETTINGS, s);
+      this.saveSettings(s);
     }
 
     return s;
@@ -73,6 +155,11 @@ export class WeddingService {
 
   static saveSettings(settings: WeddingSettings): WeddingSettings {
     setLocalItem(STORAGE_KEYS.SETTINGS, settings);
+    if (db) {
+      setDoc(doc(db, COLLECTIONS.SETTINGS, 'main_settings'), settings).catch(err => {
+        console.warn('Erro ao persistir settings no Firestore:', err);
+      });
+    }
     return settings;
   }
 
@@ -98,18 +185,18 @@ export class WeddingService {
 
     const existingIndex = guests.findIndex(g => g.id === guest.id || (guest.id && g.id === guest.id));
 
+    let finalGuest: Guest;
+
     if (existingIndex >= 0) {
-      const updated: Guest = {
+      finalGuest = {
         ...guests[existingIndex],
         ...guest,
         slug,
         updatedAt: new Date().toISOString(),
       };
-      guests[existingIndex] = updated;
-      setLocalItem(STORAGE_KEYS.GUESTS, guests);
-      return updated;
+      guests[existingIndex] = finalGuest;
     } else {
-      const newGuest: Guest = {
+      finalGuest = {
         id: guest.id || `guest-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         name: guest.name,
         phone: guest.phone || '',
@@ -124,10 +211,16 @@ export class WeddingService {
         attendedOnDay: false,
         createdAt: new Date().toISOString(),
       };
-      guests.push(newGuest);
-      setLocalItem(STORAGE_KEYS.GUESTS, guests);
-      return newGuest;
+      guests.push(finalGuest);
     }
+
+    setLocalItem(STORAGE_KEYS.GUESTS, guests);
+
+    if (db) {
+      setDoc(doc(db, COLLECTIONS.GUESTS, finalGuest.id), finalGuest).catch(console.warn);
+    }
+
+    return finalGuest;
   }
 
   static updateGuestStatus(
@@ -143,7 +236,7 @@ export class WeddingService {
 
     const isReconfirm = status === 'reconfirmed';
 
-    guests[index] = {
+    const updatedGuest: Guest = {
       ...guests[index],
       status: isReconfirm ? 'reconfirmed' : status,
       confirmedCompanions: (status === 'confirmed' || isReconfirm) ? confirmedCompanions : [],
@@ -153,8 +246,14 @@ export class WeddingService {
       updatedAt: new Date().toISOString(),
     };
 
+    guests[index] = updatedGuest;
     setLocalItem(STORAGE_KEYS.GUESTS, guests);
-    return guests[index];
+
+    if (db) {
+      setDoc(doc(db, COLLECTIONS.GUESTS, updatedGuest.id), updatedGuest).catch(console.warn);
+    }
+
+    return updatedGuest;
   }
 
   static toggleGuestCheckIn(guestId: string): Guest | null {
@@ -166,6 +265,11 @@ export class WeddingService {
     guests[index].updatedAt = new Date().toISOString();
 
     setLocalItem(STORAGE_KEYS.GUESTS, guests);
+
+    if (db) {
+      setDoc(doc(db, COLLECTIONS.GUESTS, guests[index].id), guests[index]).catch(console.warn);
+    }
+
     return guests[index];
   }
 
@@ -176,18 +280,25 @@ export class WeddingService {
       guests[index].reminderCount = (guests[index].reminderCount || 0) + 1;
       guests[index].lastReminderSentAt = new Date().toISOString();
       setLocalItem(STORAGE_KEYS.GUESTS, guests);
+
+      if (db) {
+        setDoc(doc(db, COLLECTIONS.GUESTS, guests[index].id), guests[index]).catch(console.warn);
+      }
     }
   }
 
   static deleteGuest(guestId: string): void {
     const guests = this.getGuests().filter(g => g.id !== guestId);
     setLocalItem(STORAGE_KEYS.GUESTS, guests);
+
+    if (db) {
+      deleteDoc(doc(db, COLLECTIONS.GUESTS, guestId)).catch(console.warn);
+    }
   }
 
   // --- GIFTS ---
   static getGifts(): Gift[] {
     const saved = getLocalItem<Gift[]>(STORAGE_KEYS.GIFTS, DEFAULT_GIFTS);
-    // Ensure all default gifts exist
     const missing = DEFAULT_GIFTS.filter(dg => !saved.some(sg => sg.id === dg.id));
     if (missing.length > 0) {
       const merged = [...missing, ...saved];
@@ -201,13 +312,13 @@ export class WeddingService {
     const gifts = this.getGifts();
     const existingIndex = gifts.findIndex(g => g.id === gift.id);
 
+    let finalGift: Gift;
+
     if (existingIndex >= 0) {
-      const updated: Gift = { ...gifts[existingIndex], ...gift } as Gift;
-      gifts[existingIndex] = updated;
-      setLocalItem(STORAGE_KEYS.GIFTS, gifts);
-      return updated;
+      finalGift = { ...gifts[existingIndex], ...gift } as Gift;
+      gifts[existingIndex] = finalGift;
     } else {
-      const newGift: Gift = {
+      finalGift = {
         id: gift.id || `gift-${Date.now()}`,
         title: gift.title,
         description: gift.description || '',
@@ -218,10 +329,68 @@ export class WeddingService {
         quotaPurchased: 0,
         active: true,
         isFeatured: gift.isFeatured || false,
+        reservedInPerson: false,
       };
-      gifts.push(newGift);
-      setLocalItem(STORAGE_KEYS.GIFTS, gifts);
-      return newGift;
+      gifts.push(finalGift);
+    }
+
+    setLocalItem(STORAGE_KEYS.GIFTS, gifts);
+
+    if (db) {
+      setDoc(doc(db, COLLECTIONS.GIFTS, finalGift.id), finalGift).catch(console.warn);
+    }
+
+    return finalGift;
+  }
+
+  static reserveGiftInPerson(
+    giftId: string, 
+    guestName: string, 
+    guestPhone?: string, 
+    message?: string
+  ): { success: boolean; error?: string } {
+    const gifts = this.getGifts();
+    const giftIndex = gifts.findIndex(g => g.id === giftId);
+    if (giftIndex === -1) return { success: false, error: 'Presente não encontrado.' };
+
+    if (gifts[giftIndex].reservedInPerson) {
+      return { 
+        success: false, 
+        error: `Este presente já foi reservado para entrega física por ${gifts[giftIndex].reservedByGuestName || 'outro convidado'}!` 
+      };
+    }
+
+    // Marca o presente como reservado para entrega física
+    gifts[giftIndex].reservedInPerson = true;
+    gifts[giftIndex].reservedByGuestName = guestName.trim();
+    gifts[giftIndex].reservedAt = new Date().toISOString();
+    gifts[giftIndex].quotaPurchased = (gifts[giftIndex].quotaPurchased || 0) + 1;
+
+    this.saveGift(gifts[giftIndex]);
+
+    // Registra a intenção de presente físico
+    this.recordPixContribution({
+      giftId: gifts[giftIndex].id,
+      giftTitle: gifts[giftIndex].title,
+      guestName: guestName.trim(),
+      guestPhone: guestPhone?.trim() || '',
+      amount: gifts[giftIndex].price,
+      message: message?.trim() || 'Vou entregar este presente pessoalmente no dia do casamento!',
+      status: 'confirmed',
+      paymentMethod: 'in_person',
+    });
+
+    return { success: true };
+  }
+
+  static clearGiftReservation(giftId: string): void {
+    const gifts = this.getGifts();
+    const giftIndex = gifts.findIndex(g => g.id === giftId);
+    if (giftIndex >= 0) {
+      gifts[giftIndex].reservedInPerson = false;
+      gifts[giftIndex].reservedByGuestName = undefined;
+      gifts[giftIndex].reservedAt = undefined;
+      this.saveGift(gifts[giftIndex]);
     }
   }
 
@@ -229,17 +398,24 @@ export class WeddingService {
     const contributions = getLocalItem<PixContribution[]>(STORAGE_KEYS.PIX_LOGS, []);
     const newContrib: PixContribution = {
       ...contribution,
-      id: `pix-${Date.now()}`,
+      id: `contrib-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      paymentMethod: contribution.paymentMethod || 'pix',
       createdAt: new Date().toISOString(),
     };
     contributions.push(newContrib);
     setLocalItem(STORAGE_KEYS.PIX_LOGS, contributions);
 
-    const gifts = this.getGifts();
-    const giftIndex = gifts.findIndex(g => g.id === contribution.giftId);
-    if (giftIndex >= 0) {
-      gifts[giftIndex].quotaPurchased = (gifts[giftIndex].quotaPurchased || 0) + 1;
-      setLocalItem(STORAGE_KEYS.GIFTS, gifts);
+    if (db) {
+      setDoc(doc(db, COLLECTIONS.PIX_CONTRIBUTIONS, newContrib.id), newContrib).catch(console.warn);
+    }
+
+    if (contribution.paymentMethod !== 'in_person') {
+      const gifts = this.getGifts();
+      const giftIndex = gifts.findIndex(g => g.id === contribution.giftId);
+      if (giftIndex >= 0) {
+        gifts[giftIndex].quotaPurchased = (gifts[giftIndex].quotaPurchased || 0) + 1;
+        this.saveGift(gifts[giftIndex]);
+      }
     }
 
     return newContrib;
@@ -255,6 +431,7 @@ export class WeddingService {
         amount: 250.00,
         message: 'Aproveitem muito esse jantar maravilhoso! Abraços do Carlos e Mari.',
         status: 'confirmed',
+        paymentMethod: 'pix',
         createdAt: '2026-08-11T14:20:00Z',
       },
       {
@@ -265,6 +442,7 @@ export class WeddingService {
         amount: 380.00,
         message: 'Para vocês curtirem muito o hotel dos sonhos!',
         status: 'confirmed',
+        paymentMethod: 'pix',
         createdAt: '2026-08-12T19:00:00Z',
       }
     ]);
@@ -293,7 +471,6 @@ export class WeddingService {
       }
     ]);
 
-    // Automatically normalize direct S3 URLs to safe internal media proxy
     return list.map(photo => {
       if (photo.photoUrl.includes('s3.gabryelamaro.com/casamento/')) {
         const filename = photo.photoUrl.split('s3.gabryelamaro.com/casamento/')[1];
@@ -319,6 +496,11 @@ export class WeddingService {
     };
     photos.unshift(newPhoto);
     setLocalItem(STORAGE_KEYS.PHOTOS, photos);
+
+    if (db) {
+      setDoc(doc(db, COLLECTIONS.PHOTOS, newPhoto.id), newPhoto).catch(console.warn);
+    }
+
     return newPhoto;
   }
 
@@ -328,12 +510,20 @@ export class WeddingService {
     if (index >= 0) {
       photos[index].likes = (photos[index].likes || 0) + 1;
       setLocalItem(STORAGE_KEYS.PHOTOS, photos);
+
+      if (db) {
+        setDoc(doc(db, COLLECTIONS.PHOTOS, photos[index].id), photos[index]).catch(console.warn);
+      }
     }
   }
 
   static deletePhoto(photoId: string): void {
     const photos = this.getPhotos().filter(p => p.id !== photoId);
     setLocalItem(STORAGE_KEYS.PHOTOS, photos);
+
+    if (db) {
+      deleteDoc(doc(db, COLLECTIONS.PHOTOS, photoId)).catch(console.warn);
+    }
   }
 
   // --- METRICS CALCULATION (Real-time and exhaustive) ---
@@ -381,7 +571,7 @@ export class WeddingService {
     });
 
     const totalRaisedPix = contributions
-      .filter(c => c.status === 'confirmed')
+      .filter(c => c.status === 'confirmed' && c.paymentMethod !== 'in_person')
       .reduce((sum, c) => sum + c.amount, 0);
 
     return {
