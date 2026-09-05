@@ -153,6 +153,90 @@ export class WeddingService {
     }
   }
 
+  static subscribeGuests(callback: (guests: Guest[]) => void): () => void {
+    if (!db || typeof window === 'undefined') return () => {};
+    try {
+      const unsub = onSnapshot(collection(db, COLLECTIONS.GUESTS), (snap) => {
+        if (!snap.empty) {
+          const cloudGuests: Guest[] = [];
+          snap.forEach(d => cloudGuests.push(d.data() as Guest));
+          if (cloudGuests.length > 0) {
+            setLocalItem(STORAGE_KEYS.GUESTS, cloudGuests);
+            callback(cloudGuests);
+          }
+        }
+      }, (err) => {
+        console.warn('Erro ao escutar convidados no Firestore:', err);
+      });
+      return unsub;
+    } catch {
+      return () => {};
+    }
+  }
+
+  static subscribeGifts(callback: (gifts: Gift[]) => void): () => void {
+    if (!db || typeof window === 'undefined') return () => {};
+    try {
+      const unsub = onSnapshot(collection(db, COLLECTIONS.GIFTS), (snap) => {
+        if (!snap.empty) {
+          const cloudGifts: Gift[] = [];
+          snap.forEach(d => cloudGifts.push(d.data() as Gift));
+          if (cloudGifts.length > 0) {
+            setLocalItem(STORAGE_KEYS.GIFTS, cloudGifts);
+            callback(cloudGifts);
+          }
+        }
+      }, (err) => {
+        console.warn('Erro ao escutar presentes no Firestore:', err);
+      });
+      return unsub;
+    } catch {
+      return () => {};
+    }
+  }
+
+  static subscribePix(callback: (pix: PixContribution[]) => void): () => void {
+    if (!db || typeof window === 'undefined') return () => {};
+    try {
+      const unsub = onSnapshot(collection(db, COLLECTIONS.PIX_CONTRIBUTIONS), (snap) => {
+        if (!snap.empty) {
+          const cloudPix: PixContribution[] = [];
+          snap.forEach(d => cloudPix.push(d.data() as PixContribution));
+          if (cloudPix.length > 0) {
+            setLocalItem(STORAGE_KEYS.PIX_LOGS, cloudPix);
+            callback(cloudPix);
+          }
+        }
+      }, (err) => {
+        console.warn('Erro ao escutar pix no Firestore:', err);
+      });
+      return unsub;
+    } catch {
+      return () => {};
+    }
+  }
+
+  static subscribePhotos(callback: (photos: GuestPhoto[]) => void): () => void {
+    if (!db || typeof window === 'undefined') return () => {};
+    try {
+      const unsub = onSnapshot(collection(db, COLLECTIONS.PHOTOS), (snap) => {
+        if (!snap.empty) {
+          const cloudPhotos: GuestPhoto[] = [];
+          snap.forEach(d => cloudPhotos.push(d.data() as GuestPhoto));
+          if (cloudPhotos.length > 0) {
+            setLocalItem(STORAGE_KEYS.PHOTOS, cloudPhotos);
+            callback(cloudPhotos);
+          }
+        }
+      }, (err) => {
+        console.warn('Erro ao escutar fotos no Firestore:', err);
+      });
+      return unsub;
+    } catch {
+      return () => {};
+    }
+  }
+
   static saveSettings(settings: WeddingSettings): WeddingSettings {
     setLocalItem(STORAGE_KEYS.SETTINGS, settings);
     if (db) {
@@ -223,6 +307,18 @@ export class WeddingService {
     return finalGuest;
   }
 
+  static async saveGuestAsync(guest: Partial<Guest> & { name: string }): Promise<Guest> {
+    const saved = this.saveGuest(guest);
+    if (db) {
+      try {
+        await setDoc(doc(db, COLLECTIONS.GUESTS, saved.id), saved);
+      } catch (e) {
+        console.warn('Erro ao salvar guest no Firestore:', e);
+      }
+    }
+    return saved;
+  }
+
   static updateGuestStatus(
     guestId: string, 
     status: 'confirmed' | 'declined' | 'reconfirmed', 
@@ -254,6 +350,24 @@ export class WeddingService {
     }
 
     return updatedGuest;
+  }
+
+  static async updateGuestStatusAsync(
+    guestId: string, 
+    status: 'confirmed' | 'declined' | 'reconfirmed', 
+    confirmedCompanions: Companion[] = [],
+    dietRestrictions: string = '',
+    message: string = ''
+  ): Promise<Guest | null> {
+    const updated = this.updateGuestStatus(guestId, status, confirmedCompanions, dietRestrictions, message);
+    if (updated && db) {
+      try {
+        await setDoc(doc(db, COLLECTIONS.GUESTS, updated.id), updated);
+      } catch (e) {
+        console.warn('Erro ao atualizar guest no Firestore:', e);
+      }
+    }
+    return updated;
   }
 
   static toggleGuestCheckIn(guestId: string): Guest | null {

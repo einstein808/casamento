@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { db, COLLECTIONS } from '@/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export async function POST(request: Request) {
   try {
@@ -12,8 +14,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // In a full Firebase production backend, this writes to Firestore:
-    // await db.collection('guests').doc(guestId).update({ status, confirmedCompanions, dietRestrictions, message });
+    if (db) {
+      const guestRef = doc(db, COLLECTIONS.GUESTS, guestId);
+      const snap = await getDoc(guestRef);
+      const existing = snap.exists() ? snap.data() : {};
+      const updated = {
+        ...existing,
+        id: guestId,
+        status: status || existing.status || 'confirmed',
+        confirmedCompanions: confirmedCompanions || [],
+        dietRestrictions: dietRestrictions || '',
+        message: message || '',
+        updatedAt: new Date().toISOString(),
+      };
+      await setDoc(guestRef, updated, { merge: true });
+      return NextResponse.json({ success: true, guest: updated });
+    }
 
     return NextResponse.json({
       success: true,
@@ -26,3 +42,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

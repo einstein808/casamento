@@ -133,6 +133,42 @@ export default function AdminDashboardPage() {
     if (unlocked === 'true') {
       setIsAuthenticated(true);
     }
+
+    // 1. Initial Cloud Sync
+    WeddingService.syncAllFromCloud().then(() => {
+      reloadAll();
+    });
+
+    // 2. Real-time Firestore subscriptions across all tabs and devices
+    const unsubSettings = WeddingService.subscribeSettings((newSettings) => {
+      setSettings(newSettings);
+    });
+
+    const unsubGuests = WeddingService.subscribeGuests((newGuests) => {
+      setGuests(newGuests);
+      setMetrics(WeddingService.getMetrics());
+    });
+
+    const unsubGifts = WeddingService.subscribeGifts((newGifts) => {
+      setGifts(newGifts);
+    });
+
+    const unsubPix = WeddingService.subscribePix((newPix) => {
+      setPixLogs(newPix);
+      setMetrics(WeddingService.getMetrics());
+    });
+
+    const unsubPhotos = WeddingService.subscribePhotos((newPhotos) => {
+      setPhotos(newPhotos);
+    });
+
+    return () => {
+      unsubSettings();
+      unsubGuests();
+      unsubGifts();
+      unsubPix();
+      unsubPhotos();
+    };
   }, []);
 
   const handleLogin = (e: React.FormEvent) => {

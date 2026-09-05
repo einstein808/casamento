@@ -110,7 +110,7 @@ export function RSVPSection({ initialGuest }: RSVPSectionProps) {
     setCompanions(updated);
   };
 
-  const handleSubmit = (e: React.FormEvent, forceStatus?: 'confirmed' | 'declined' | 'reconfirmed') => {
+  const handleSubmit = async (e: React.FormEvent, forceStatus?: 'confirmed' | 'declined' | 'reconfirmed') => {
     if (e) e.preventDefault();
 
     const targetStatus: 'confirmed' | 'declined' | 'reconfirmed' = forceStatus || (status === 'declined' ? 'declined' : 'confirmed');
@@ -139,11 +139,11 @@ export function RSVPSection({ initialGuest }: RSVPSectionProps) {
     setIsSubmitting(true);
     setErrorMessage('');
 
-    setTimeout(() => {
+    try {
       let savedGuest: Guest | null = null;
 
       if (isDirectForm) {
-        savedGuest = WeddingService.saveGuest({
+        savedGuest = await WeddingService.saveGuestAsync({
           name: directName.trim(),
           phone: directPhone.trim(),
           maxCompanions: companions.length,
@@ -153,7 +153,7 @@ export function RSVPSection({ initialGuest }: RSVPSectionProps) {
           message: message,
         });
       } else if (selectedGuest) {
-        savedGuest = WeddingService.updateGuestStatus(
+        savedGuest = await WeddingService.updateGuestStatusAsync(
           selectedGuest.id,
           targetStatus,
           (targetStatus === 'confirmed' || targetStatus === 'reconfirmed') ? companions : [],
@@ -166,7 +166,6 @@ export function RSVPSection({ initialGuest }: RSVPSectionProps) {
         setSelectedGuest(savedGuest);
         setStatus(targetStatus);
         setIsCompleted(true);
-        setIsSubmitting(false);
 
         if (targetStatus === 'confirmed' || targetStatus === 'reconfirmed') {
           confetti({
@@ -177,10 +176,14 @@ export function RSVPSection({ initialGuest }: RSVPSectionProps) {
           });
         }
       } else {
-        setIsSubmitting(false);
         setErrorMessage('Ocorreu um erro ao salvar sua confirmação. Tente novamente.');
       }
-    }, 600);
+    } catch (err: any) {
+      console.error('Erro ao salvar RSVP:', err);
+      setErrorMessage('Erro de conexão ao salvar sua confirmação. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
